@@ -1,0 +1,25 @@
+[package]
+name = "fhe-app"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib"]
+
+[[bin]]
+name = "fhe-app"
+path = "src/main.rs"
+
+[dependencies]
+tfhe = { version = "0.11.1", features = ["boolean", "shortint", "integer"] }
+bincode = "1.3.3"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+wasm-bindgen = "0.2"
+wee_alloc = "0.4"
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+panic = "abort"
