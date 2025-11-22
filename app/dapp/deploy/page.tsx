@@ -69,6 +69,8 @@ Build sealed, invisible applications with openIO.
 
   const [deployedAddress, setDeployedAddress] = useState<string | null>(null);
   const [isDeploying, setIsDeploying] = useState(false);
+  const [zkCompilation, setZkCompilation] = useState<any>(null);
+  const [isCompilingZk, setIsCompilingZk] = useState(false);
 
   const handleCompile = async () => {
     setIsCompiling(true);
@@ -104,6 +106,111 @@ Build sealed, invisible applications with openIO.
       ]);
     } finally {
       setIsCompiling(false);
+    }
+  };
+
+  const handleCompileZKCircuit = async () => {
+    setIsCompilingZk(true);
+    setTerminalOutput(prev => [...prev, '> Compiling ZK circuit...']);
+
+    try {
+      // Determine circuit type from filename
+      const isZKCircuit = selectedFile?.endsWith('.circom') || selectedFile?.endsWith('.cairo');
+      
+      if (!isZKCircuit) {
+        setTerminalOutput(prev => [
+          ...prev,
+          '⚠ This is not a ZK circuit file (.circom/.cairo required)'
+        ]);
+        return;
+      }
+
+      const type = selectedFile?.endsWith('.circom') ? 'circom' : 'cairo';
+      const circuit = selectedFile?.replace('.circom', '').replace('.cairo', '');
+      const source = files[selectedFile || ''];
+
+      const response = await fetch('/api/zk', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'generate',
+          circuit,
+          type,
+          parameters: {}
+        })
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        setZkCompilation(result.result);
+        setTerminalOutput(prev => [
+          ...prev,
+          `✓ ZK ${type} circuit compiled successfully`,
+          `✓ Circuit: ${circuit}`,
+          `✓ Type: ${type}`,
+          `✓ Ready for Boundless deployment`
+        ]);
+      } else {
+        setTerminalOutput(prev => [
+          ...prev,
+          `✗ ZK compilation failed: ${result.error}`
+        ]);
+      }
+    } catch (error) {
+      setTerminalOutput(prev => [
+        ...prev,
+        `✗ ZK compilation error: ${error}`
+      ]);
+    } finally {
+      setIsCompilingZk(false);
+    }
+  };
+
+  const handleDeployBoundless = async () => {
+    setIsDeploying(true);
+    setTerminalOutput(prev => [...prev, '> Deploying to Boundless...']);
+    
+    try {
+      const type = selectedFile?.endsWith('.circom') ? 'circom' : 'cairo';
+      const circuit = selectedFile?.replace('.circom', '').replace('.cairo', '');
+      
+      const response = await fetch('/api/zk/boundless', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          circuit,
+          type,
+          parameters: {},
+          private_key: process.env.NEXT_PUBLIC_PRIVATE_KEY || '0x1234abcd',
+          rpc_url: 'https://boundless.market'
+        })
+      });
+
+      const result = await response.json();
+      
+      if (result.success) {
+        setDeployedAddress(result.deploymentId);
+        setTerminalOutput(prev => [
+          ...prev,
+          `✅ Boundless Deployment Successful!`,
+          `🔗 Deployment ID: ${result.deploymentId}`,
+          `📊 View at: https://boundless.market/deployments/${result.deploymentId}`,
+          `⏱️ Processing typically takes 2-5 minutes`
+        ]);
+      } else {
+        setTerminalOutput(prev => [
+          ...prev,
+          `✗ Boundless deployment failed: ${result.error}`
+        ]);
+      }
+    } catch (error) {
+      setTerminalOutput(prev => [
+        ...prev,
+        `✗ Boundless deployment error: ${error}`
+      ]);
+    } finally {
+      setIsDeploying(false);
     }
   };
 
@@ -181,11 +288,25 @@ Build sealed, invisible applications with openIO.
                   {isCompiling ? 'Compiling...' : 'Compile'}
                 </button>
                 <button 
+                  className="toolbar-btn compile-btn"
+                  onClick={handleCompileZKCircuit}
+                  disabled={isCompilingZk || isDeploying}
+                >
+                  {isCompilingZk ? 'Building ZK...' : 'Build ZK'}
+                </button>
+                <button 
                   className="toolbar-btn deploy-btn"
                   onClick={handleDeploy}
                   disabled={isCompiling || isDeploying}
                 >
                   {isDeploying ? 'Deploying...' : 'Deploy'}
+                </button>
+                <button 
+                  className="toolbar-btn deploy-btn"
+                  onClick={handleDeployBoundless}
+                  disabled={isCompiling || isDeploying}
+                >
+                  Deploy to Boundless
                 </button>
               </div>
             </div>
