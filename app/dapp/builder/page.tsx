@@ -1,39 +1,27 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import { ReactFlow, applyNodeChanges, applyEdgeChanges, addEdge, Background, Controls, MiniMap, Node, Edge } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import Navbar from '../../components/Navbar';
+import { models, getModelsByCategory, ModelCategory } from '../../data/models';
 
-const initialNodes: Node[] = [
-  { 
-    id: '1', 
-    position: { x: 250, y: 100 }, 
-    data: { label: 'ZK Circuit' },
-    type: 'default',
-  },
-  { 
-    id: '2', 
-    position: { x: 100, y: 200 }, 
-    data: { label: 'FHE Engine' },
-    type: 'default',
-  },
-  { 
-    id: '3', 
-    position: { x: 400, y: 200 }, 
-    data: { label: 'iO Module' },
-    type: 'default',
-  },
-];
+const initialNodes: Node[] = [];
 
-const initialEdges: Edge[] = [
-  { id: 'e1-2', source: '1', target: '2' },
-  { id: 'e1-3', source: '1', target: '3' },
-];
+const initialEdges: Edge[] = [];
 
 export default function BuilderPage() {
   const [nodes, setNodes] = useState<Node[]>(initialNodes);
   const [edges, setEdges] = useState<Edge[]>(initialEdges);
+  const [selectedZK, setSelectedZK] = useState('');
+  const [selectedFHE, setSelectedFHE] = useState('');
+  const [selectedIO, setSelectedIO] = useState('');
+  const [selectedOp, setSelectedOp] = useState('');
+
+  const zkModels = useMemo(() => getModelsByCategory('zk'), []);
+  const fheModels = useMemo(() => getModelsByCategory('fhe'), []);
+  const ioModels = useMemo(() => getModelsByCategory('io'), []);
+  const opModels = useMemo(() => getModelsByCategory('operation'), []);
 
   const onNodesChange = useCallback(
     (changes: any) => setNodes((nds) => applyNodeChanges(changes, nds)),
@@ -50,15 +38,133 @@ export default function BuilderPage() {
     []
   );
 
+  const addNode = useCallback((label: string, category: string) => {
+    const newNode: Node = {
+      id: `${category}-${Date.now()}`,
+      position: { 
+        x: Math.random() * 400 + 100, 
+        y: Math.random() * 300 + 100 
+      },
+      data: { label },
+      type: 'default',
+    };
+    setNodes((nds) => [...nds, newNode]);
+  }, []);
+
+  const handleZKChange = (value: string) => {
+    setSelectedZK(value);
+    if (value) {
+      const model = zkModels.find(m => m.id === value);
+      if (model) {
+        addNode(model.name, 'zk');
+        setSelectedZK(''); // Reset dropdown
+      }
+    }
+  };
+
+  const handleFHEChange = (value: string) => {
+    setSelectedFHE(value);
+    if (value) {
+      const model = fheModels.find(m => m.id === value);
+      if (model) {
+        addNode(model.name, 'fhe');
+        setSelectedFHE(''); // Reset dropdown
+      }
+    }
+  };
+
+  const handleIOChange = (value: string) => {
+    setSelectedIO(value);
+    if (value) {
+      const model = ioModels.find(m => m.id === value);
+      if (model) {
+        addNode(model.name, 'io');
+        setSelectedIO(''); // Reset dropdown
+      }
+    }
+  };
+
+  const handleOpChange = (value: string) => {
+    setSelectedOp(value);
+    if (value) {
+      const model = opModels.find(m => m.id === value);
+      if (model) {
+        addNode(model.name, 'op');
+        setSelectedOp(''); // Reset dropdown
+      }
+    }
+  };
+
   return (
     <>
       <Navbar />
       <div className="builder-page">
         <div className="builder-header">
-          <h1 className="builder-title">Workflow Builder</h1>
-          <p className="builder-subtitle">
-            Drag and drop to build privacy computation workflows
-          </p>
+          <div className="builder-dropdowns">
+            <div className="builder-dropdown-group">
+              <label className="builder-dropdown-label">ZK Circuits</label>
+              <select
+                className="builder-dropdown"
+                value={selectedZK}
+                onChange={(e) => handleZKChange(e.target.value)}
+              >
+                <option value="">Select ZK Circuit...</option>
+                {zkModels.map(model => (
+                  <option key={model.id} value={model.id}>
+                    {model.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="builder-dropdown-group">
+              <label className="builder-dropdown-label">FHE Engines</label>
+              <select
+                className="builder-dropdown"
+                value={selectedFHE}
+                onChange={(e) => handleFHEChange(e.target.value)}
+              >
+                <option value="">Select FHE Engine...</option>
+                {fheModels.map(model => (
+                  <option key={model.id} value={model.id}>
+                    {model.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="builder-dropdown-group">
+              <label className="builder-dropdown-label">iO Coprocessors</label>
+              <select
+                className="builder-dropdown"
+                value={selectedIO}
+                onChange={(e) => handleIOChange(e.target.value)}
+              >
+                <option value="">Select iO Coprocessor...</option>
+                {ioModels.map(model => (
+                  <option key={model.id} value={model.id}>
+                    {model.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="builder-dropdown-group">
+              <label className="builder-dropdown-label">Operations</label>
+              <select
+                className="builder-dropdown"
+                value={selectedOp}
+                onChange={(e) => handleOpChange(e.target.value)}
+              >
+                <option value="">Select Operation...</option>
+                {opModels.map(model => (
+                  <option key={model.id} value={model.id}>
+                    {model.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
         </div>
         <div className="builder-flow-container">
           <ReactFlow
