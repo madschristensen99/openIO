@@ -108,7 +108,7 @@ export default function BuilderPage() {
                 value={selectedZK}
                 onChange={(e) => handleZKChange(e.target.value)}
               >
-                <option value="">Select ZK Circuit...</option>
+                <option value="">Add ZK Circuit</option>
                 {zkModels.map(model => (
                   <option key={model.id} value={model.id}>
                     {model.name}
@@ -124,7 +124,7 @@ export default function BuilderPage() {
                 value={selectedFHE}
                 onChange={(e) => handleFHEChange(e.target.value)}
               >
-                <option value="">Select FHE Engine...</option>
+                <option value="">Add FHE Engine</option>
                 {fheModels.map(model => (
                   <option key={model.id} value={model.id}>
                     {model.name}
@@ -140,7 +140,7 @@ export default function BuilderPage() {
                 value={selectedIO}
                 onChange={(e) => handleIOChange(e.target.value)}
               >
-                <option value="">Select iO Coprocessor...</option>
+                <option value="">Add iO Coprocessor</option>
                 {ioModels.map(model => (
                   <option key={model.id} value={model.id}>
                     {model.name}
@@ -156,7 +156,7 @@ export default function BuilderPage() {
                 value={selectedOp}
                 onChange={(e) => handleOpChange(e.target.value)}
               >
-                <option value="">Select Operation...</option>
+                <option value="">Add Operation</option>
                 {opModels.map(model => (
                   <option key={model.id} value={model.id}>
                     {model.name}
