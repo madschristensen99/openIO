@@ -5,6 +5,7 @@ import { ReactFlow, applyNodeChanges, applyEdgeChanges, addEdge, Background, Con
 import '@xyflow/react/dist/style.css';
 import Navbar from '../../components/Navbar';
 import { models, getModelsByCategory, ModelCategory } from '../../data/models';
+import AIChat from '../components/AIChat';
 
 const initialNodes: Node[] = [];
 
@@ -17,6 +18,7 @@ export default function BuilderPage() {
   const [selectedFHE, setSelectedFHE] = useState('');
   const [selectedIO, setSelectedIO] = useState('');
   const [selectedOp, setSelectedOp] = useState('');
+  const [isAISidebarOpen, setIsAISidebarOpen] = useState(true);
 
   const zkModels = useMemo(() => getModelsByCategory('zk'), []);
   const fheModels = useMemo(() => getModelsByCategory('fhe'), []);
@@ -166,24 +168,44 @@ export default function BuilderPage() {
             </div>
           </div>
         </div>
-        <div className="builder-flow-container">
-          <ReactFlow
-            nodes={nodes}
-            edges={edges}
-            onNodesChange={onNodesChange}
-            onEdgesChange={onEdgesChange}
-            onConnect={onConnect}
-            fitView
-            className="react-flow-dark"
-          >
-            <Background />
-            <Controls />
-            <MiniMap 
-              nodeColor="#667eea"
-              maskColor="rgba(0, 0, 0, 0.8)"
-              style={{ backgroundColor: 'rgba(0, 0, 0, 0.9)' }}
-            />
-          </ReactFlow>
+        <div className="builder-main-content">
+          <div className={`builder-flow-container ${isAISidebarOpen ? 'with-sidebar' : ''}`}>
+            <ReactFlow
+              nodes={nodes}
+              edges={edges}
+              onNodesChange={onNodesChange}
+              onEdgesChange={onEdgesChange}
+              onConnect={onConnect}
+              fitView
+              className="react-flow-dark"
+            >
+              <Background />
+              <Controls />
+              <MiniMap 
+                nodeColor="#667eea"
+                maskColor="rgba(0, 0, 0, 0.8)"
+                style={{ backgroundColor: 'rgba(0, 0, 0, 0.9)' }}
+              />
+            </ReactFlow>
+          </div>
+          
+          <div className={`builder-ai-sidebar ${isAISidebarOpen ? 'open' : 'collapsed'}`}>
+            <div className="ai-sidebar-header">
+              <h3 className="ai-sidebar-title">AI Assistant</h3>
+              <button 
+                className="ai-sidebar-toggle"
+                onClick={() => setIsAISidebarOpen(!isAISidebarOpen)}
+                aria-label={isAISidebarOpen ? 'Minimize' : 'Expand'}
+              >
+                {isAISidebarOpen ? '−' : '+'}
+              </button>
+            </div>
+            {isAISidebarOpen && (
+              <div className="ai-sidebar-content">
+                <AIChat />
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </>

@@ -1330,6 +1330,21 @@ body {
   flex-direction: column;
   overflow: hidden;
   flex-shrink: 0;
+  height: 100%;
+}
+
+.builder-ai-sidebar .ai-chat {
+  width: 100%;
+  background: transparent;
+  border: none;
+}
+
+.builder-ai-sidebar .builder-chat-header {
+  display: none;
+}
+
+.builder-ai-sidebar .chat-messages {
+  padding: 16px;
 }
 
 .chat-header {
@@ -2148,21 +2163,22 @@ body {
   max-width: 1400px;
   margin: 0 auto;
   padding: 40px 24px 32px;
-  text-align: center;
 }
 
 .community-title {
-  font-size: 48px;
-  font-weight: 700;
+  font-size: 28px;
+  font-weight: 600;
   color: rgba(255, 255, 255, 0.95);
-  margin: 0 0 12px 0;
+  margin: 0 0 6px 0;
+  letter-spacing: -0.02em;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;
 }
 
 .community-subtitle {
-  font-size: 18px;
-  color: rgba(255, 255, 255, 0.6);
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.5);
   margin: 0;
+  font-weight: 400;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;
 }
 
@@ -2171,164 +2187,173 @@ body {
   margin: 0 auto;
   padding: 0 24px 40px;
   display: grid;
-  grid-template-columns: 280px 1fr;
-  gap: 24px;
+  grid-template-columns: 240px 1fr;
+  gap: 32px;
 }
 
 .forum-sidebar {
   display: flex;
   flex-direction: column;
-  gap: 24px;
 }
 
-.sidebar-section {
-  background: rgba(255, 255, 255, 0.02);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 12px;
-  padding: 20px;
+.forum-sidebar .sidebar-section {
+  background: transparent;
+  border: none;
+  padding: 0;
 }
 
-.sidebar-title {
-  font-size: 16px;
+.forum-sidebar .sidebar-title {
+  font-size: 12px;
   font-weight: 600;
-  color: rgba(255, 255, 255, 0.95);
+  color: rgba(255, 255, 255, 0.5);
+  text-transform: uppercase;
+  letter-spacing: 1px;
   margin: 0 0 16px 0;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;
 }
 
-.category-list {
+.forum-sidebar .category-list {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 4px;
 }
 
-.category-item {
+.forum-sidebar .category-item {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 12px;
-  border: none;
-  background: transparent;
+  justify-content: space-between;
+  padding: 14px 16px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.02);
   border-radius: 8px;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: all 0.15s ease;
   text-align: left;
   color: rgba(255, 255, 255, 0.7);
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;
+  width: 100%;
 }
 
-.category-item:hover {
-  background: rgba(255, 255, 255, 0.05);
+.forum-sidebar .category-item:hover {
+  background: rgba(255, 255, 255, 0.04);
+  border-color: rgba(255, 255, 255, 0.15);
   color: rgba(255, 255, 255, 0.9);
 }
 
-.category-item.active {
-  background: rgba(255, 255, 255, 0.1);
+.forum-sidebar .category-item.active {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.2);
   color: rgba(255, 255, 255, 0.95);
-}
-
-.category-icon {
-  font-size: 20px;
-}
-
-.category-info {
-  display: flex;
-  flex-direction: column;
-  flex: 1;
-}
-
-.category-name {
-  font-size: 14px;
   font-weight: 500;
 }
 
-.category-count {
-  font-size: 12px;
+.forum-sidebar .category-info {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  gap: 12px;
+}
+
+.forum-sidebar .category-name {
+  font-size: 14px;
+  font-weight: inherit;
+  letter-spacing: -0.01em;
+  flex: 1;
+}
+
+.forum-sidebar .category-count {
+  font-size: 13px;
   color: rgba(255, 255, 255, 0.5);
-  margin-top: 2px;
+  font-weight: 500;
+  background: rgba(255, 255, 255, 0.08);
+  padding: 4px 10px;
+  border-radius: 12px;
+  min-width: 32px;
+  text-align: center;
+  flex-shrink: 0;
+}
+
+.forum-sidebar .category-item.active .category-count {
+  color: rgba(255, 255, 255, 0.8);
+  background: rgba(255, 255, 255, 0.12);
 }
 
 .new-post-btn {
   width: 100%;
-  padding: 14px;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  border: none;
+  padding: 12px 16px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 8px;
-  color: white;
-  font-size: 15px;
-  font-weight: 600;
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 14px;
+  font-weight: 500;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: all 0.15s ease;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 8px;
+  margin-top: 24px;
 }
 
 .new-post-btn:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 8px 20px rgba(102, 126, 234, 0.4);
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.15);
 }
 
 .new-post-btn span {
-  font-size: 20px;
+  font-size: 18px;
   font-weight: 300;
 }
 
 .forum-main {
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 24px;
 }
 
 .forum-toolbar {
   display: flex;
-  gap: 16px;
+  gap: 12px;
   align-items: center;
+  margin-bottom: 8px;
 }
 
-.search-box {
+.forum-main .search-box {
   flex: 1;
   position: relative;
 }
 
-.search-input {
+.forum-main .search-input {
   width: 100%;
-  padding: 12px 16px 12px 44px;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 8px;
+  padding: 10px 16px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 6px;
   color: rgba(255, 255, 255, 0.95);
   font-size: 14px;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;
-  transition: all 0.2s;
+  transition: all 0.15s ease;
 }
 
-.search-input:focus {
+.forum-main .search-input:focus {
   outline: none;
-  border-color: rgba(102, 126, 234, 0.5);
-  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.15);
+  background: rgba(255, 255, 255, 0.06);
 }
 
-.search-input::placeholder {
-  color: rgba(255, 255, 255, 0.4);
-}
-
-.search-icon {
-  position: absolute;
-  left: 14px;
-  top: 50%;
-  transform: translateY(-50%);
-  font-size: 18px;
-  pointer-events: none;
+.forum-main .search-input::placeholder {
+  color: rgba(255, 255, 255, 0.35);
 }
 
 .sort-select {
-  padding: 12px 16px;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 8px;
+  padding: 10px 16px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 6px;
   color: rgba(255, 255, 255, 0.95);
   font-size: 14px;
   cursor: pointer;
@@ -2337,37 +2362,37 @@ body {
 
 .sort-select:focus {
   outline: none;
-  border-color: rgba(102, 126, 234, 0.5);
+  border-color: rgba(255, 255, 255, 0.15);
 }
 
 .forum-posts {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 1px;
 }
 
 .forum-post {
   background: rgba(255, 255, 255, 0.02);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 12px;
-  padding: 20px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 8px;
+  padding: 20px 24px;
   display: grid;
-  grid-template-columns: 48px 1fr 140px;
+  grid-template-columns: 40px 1fr 140px;
   gap: 16px;
   align-items: start;
-  transition: all 0.2s;
+  transition: all 0.15s ease;
+  cursor: pointer;
   position: relative;
 }
 
 .forum-post:hover {
   background: rgba(255, 255, 255, 0.04);
-  border-color: rgba(255, 255, 255, 0.15);
-  transform: translateY(-2px);
+  border-color: rgba(255, 255, 255, 0.1);
 }
 
 .forum-post.pinned {
-  background: rgba(102, 126, 234, 0.1);
-  border-color: rgba(102, 126, 234, 0.3);
+  background: rgba(255, 255, 255, 0.03);
+  border-color: rgba(255, 255, 255, 0.12);
 }
 
 .pin-badge,
@@ -2375,34 +2400,41 @@ body {
   position: absolute;
   top: 12px;
   right: 12px;
-  font-size: 12px;
-  padding: 4px 8px;
-  background: rgba(102, 126, 234, 0.2);
+  font-size: 10px;
+  padding: 3px 8px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 4px;
-  color: rgba(255, 255, 255, 0.9);
+  color: rgba(255, 255, 255, 0.6);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  font-weight: 500;
 }
 
 .lock-badge {
-  background: rgba(255, 255, 255, 0.1);
-  top: 40px;
+  top: 36px;
 }
 
 .post-avatar {
-  width: 48px;
-  height: 48px;
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.1);
+  width: 40px;
+  height: 40px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.08);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 24px;
+  font-size: 16px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.9);
   flex-shrink: 0;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;
 }
 
 .post-content {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 10px;
   min-width: 0;
 }
 
@@ -2413,17 +2445,18 @@ body {
 }
 
 .post-title {
-  font-size: 18px;
-  font-weight: 600;
+  font-size: 16px;
+  font-weight: 500;
   color: rgba(255, 255, 255, 0.95);
   margin: 0;
   cursor: pointer;
-  transition: color 0.2s;
+  transition: color 0.15s ease;
+  letter-spacing: -0.01em;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;
 }
 
-.post-title:hover {
-  color: rgba(102, 126, 234, 1);
+.forum-post:hover .post-title {
+  color: rgba(255, 255, 255, 1);
 }
 
 .post-meta {
@@ -2432,27 +2465,29 @@ body {
   align-items: center;
   font-size: 13px;
   color: rgba(255, 255, 255, 0.5);
+  font-weight: 400;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;
 }
 
 .post-author {
-  font-weight: 500;
+  font-weight: 400;
 }
 
 .post-tags {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
-  margin-top: 4px;
+  margin-top: 2px;
 }
 
 .post-tag {
   font-size: 11px;
-  padding: 4px 8px;
-  background: rgba(102, 126, 234, 0.15);
-  border: 1px solid rgba(102, 126, 234, 0.3);
+  padding: 3px 8px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 4px;
-  color: rgba(102, 126, 234, 0.9);
+  color: rgba(255, 255, 255, 0.6);
+  font-weight: 400;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;
 }
 
@@ -2950,6 +2985,170 @@ body {
   }
 }
 
+/* Profile Page Styles */
+.profile-page {
+  min-height: 100vh;
+  background: #000000;
+  padding-top: 80px;
+  color: rgba(255, 255, 255, 0.95);
+}
+
+.profile-container {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 40px 24px;
+}
+
+.profile-header {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  margin-bottom: 40px;
+  padding-bottom: 32px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.profile-avatar {
+  width: 80px;
+  height: 80px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.08);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 32px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.9);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;
+  flex-shrink: 0;
+}
+
+.profile-info {
+  flex: 1;
+}
+
+.profile-name {
+  font-size: 32px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.95);
+  margin: 0 0 6px 0;
+  letter-spacing: -0.02em;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;
+}
+
+.profile-bio {
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.5);
+  margin: 0;
+  font-weight: 400;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;
+}
+
+.profile-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+  margin-bottom: 40px;
+}
+
+.stat-card {
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 8px;
+  padding: 20px;
+  transition: all 0.15s ease;
+}
+
+.stat-card:hover {
+  background: rgba(255, 255, 255, 0.04);
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+.stat-label {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.5);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 8px;
+  font-weight: 500;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;
+}
+
+.stat-value {
+  font-size: 24px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.95);
+  margin-bottom: 6px;
+  letter-spacing: -0.01em;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;
+}
+
+.stat-value.revenue {
+  color: rgba(76, 175, 80, 0.9);
+}
+
+.stat-description {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.4);
+  font-weight: 400;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;
+}
+
+.profile-section {
+  margin-top: 40px;
+}
+
+.section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 24px;
+}
+
+.section-title {
+  font-size: 20px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.95);
+  margin: 0;
+  letter-spacing: -0.01em;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;
+}
+
+.section-count {
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.5);
+  font-weight: 400;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;
+}
+
+.meta-item.earnings {
+  border-left: 2px solid rgba(76, 175, 80, 0.3);
+  padding-left: 12px;
+}
+
+.revenue-value {
+  color: rgba(76, 175, 80, 0.9);
+  font-weight: 600;
+}
+
+@media (max-width: 768px) {
+  .profile-header {
+    flex-direction: column;
+    text-align: center;
+  }
+  
+  .profile-stats {
+    grid-template-columns: 1fr;
+  }
+  
+  .section-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+}
+
 /* Builder Page Styles */
 .builder-page {
   width: 100vw;
@@ -3034,12 +3233,136 @@ body {
   font-size: 13px;
 }
 
+.builder-main-content {
+  display: flex;
+  flex: 1;
+  width: 100%;
+  height: 100%;
+  position: relative;
+  overflow: hidden;
+}
+
 .builder-flow-container {
   flex: 1;
   width: 100%;
   height: 100%;
   position: relative;
   overflow: hidden;
+  transition: width 0.3s ease;
+}
+
+.builder-flow-container.with-sidebar {
+  width: calc(100% - 360px);
+}
+
+.builder-ai-sidebar {
+  width: 360px;
+  background: rgba(0, 0, 0, 0.6);
+  border-left: 1px solid rgba(255, 255, 255, 0.08);
+  display: flex;
+  flex-direction: column;
+  transition: width 0.3s ease, opacity 0.3s ease;
+  overflow: hidden;
+}
+
+.builder-ai-sidebar.collapsed {
+  width: 0;
+  border-left: none;
+}
+
+.ai-sidebar-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(0, 0, 0, 0.4);
+  flex-shrink: 0;
+}
+
+.ai-sidebar-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.95);
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;
+}
+
+.ai-sidebar-toggle {
+  width: 24px;
+  height: 24px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 4px;
+  color: rgba(255, 255, 255, 0.8);
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;
+  padding: 0;
+  line-height: 1;
+}
+
+.ai-sidebar-toggle:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.15);
+  color: rgba(255, 255, 255, 0.95);
+}
+
+.ai-sidebar-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  min-width: 360px;
+}
+
+.builder-ai-sidebar.collapsed .ai-sidebar-content {
+  display: none;
+}
+
+.builder-ai-sidebar.collapsed {
+  width: 48px;
+  min-width: 48px;
+}
+
+.builder-ai-sidebar.collapsed .ai-sidebar-header {
+  width: 100%;
+  padding: 12px;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.builder-ai-sidebar.collapsed .ai-sidebar-title {
+  display: none;
+}
+
+.builder-ai-sidebar.collapsed .ai-sidebar-toggle {
+  width: 100%;
+  height: 24px;
+}
+
+@media (max-width: 1024px) {
+  .builder-flow-container.with-sidebar {
+    width: 100%;
+  }
+  
+  .builder-ai-sidebar {
+    position: absolute;
+    right: 0;
+    top: 0;
+    bottom: 0;
+    z-index: 100;
+    box-shadow: -4px 0 12px rgba(0, 0, 0, 0.3);
+  }
+  
+  .builder-ai-sidebar.collapsed {
+    width: 48px;
+  }
 }
 
 /* React Flow Dark Theme */

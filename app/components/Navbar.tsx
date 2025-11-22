@@ -24,7 +24,6 @@ export default function Navbar() {
           <Link href="/dapp/deploy" className="nav-link">Deploy</Link>
           <Link href="/community" className="nav-link">Community</Link>
           <Link href="/docs" className="nav-link">Docs</Link>
-          <Link href="/pricing" className="nav-link">Pricing</Link>
           <Link href="/profile" className="nav-link">Profile</Link>
         </div>
       </div>

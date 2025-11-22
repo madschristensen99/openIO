@@ -84,7 +84,7 @@ export default function AIChat() {
 
   return (
     <div className="ai-chat">
-      <div className="chat-header">
+      <div className="chat-header builder-chat-header">
         <h3>AI Assistant</h3>
       </div>
       
@@ -118,7 +118,7 @@ export default function AIChat() {
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyPress={handleKeyPress}
-          placeholder="Ask about openIO, sealed logic, or get help..."
+          placeholder="Ask about workflows, nodes, or get help..."
           rows={2}
         />
         <button 

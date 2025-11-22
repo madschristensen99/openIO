@@ -214,7 +214,6 @@ export default function CommunityPage() {
                     className={`category-item ${selectedCategory === category.id ? 'active' : ''}`}
                     onClick={() => setSelectedCategory(category.id)}
                   >
-                    <span className="category-icon">{category.icon}</span>
                     <div className="category-info">
                       <span className="category-name">{category.name}</span>
                       {category.postCount > 0 && (
@@ -243,7 +242,6 @@ export default function CommunityPage() {
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className="search-input"
                 />
-                <span className="search-icon">🔍</span>
               </div>
               <div className="sort-options">
                 <select className="sort-select">
@@ -261,8 +259,8 @@ export default function CommunityPage() {
                   key={post.id}
                   className={`forum-post ${post.isPinned ? 'pinned' : ''} ${post.isLocked ? 'locked' : ''}`}
                 >
-                  {post.isPinned && <span className="pin-badge">📌 Pinned</span>}
-                  {post.isLocked && <span className="lock-badge">🔒 Locked</span>}
+                  {post.isPinned && <span className="pin-badge">Pinned</span>}
+                  {post.isLocked && <span className="lock-badge">Locked</span>}
                   
                   <div className="post-avatar">
                     {post.authorAvatar}

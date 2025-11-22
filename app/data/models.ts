@@ -42,7 +42,7 @@ export const models: Model[] = [
   {
     id: 'zk-arbitrage',
     name: 'Arbitrage Proof Circuit',
-    author: 'crypto-dev',
+    author: 'openio',
     category: 'zk',
     description: 'ZK circuit for private arbitrage strategy verification',
     downloads: '15.2k',
@@ -68,7 +68,7 @@ export const models: Model[] = [
   {
     id: 'fhe-encrypt',
     name: 'FHE Encryption Engine',
-    author: 'fhe-lab',
+    author: 'openio',
     category: 'fhe',
     description: 'Fully homomorphic encryption engine for private computation',
     downloads: '11.3k',
