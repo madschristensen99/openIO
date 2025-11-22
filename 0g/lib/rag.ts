@@ -1,0 +1,117 @@
+import OpenAI from 'openai'
+import * as fs from 'fs'
+
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
+})
+
+export interface Chunk {
+  content: string
+  embedding: number[]
+  index: number
+}
+
+export async function chunkDocument(content: string, chunkSize: number = 1200, overlap: number = 200): Promise<string[]> {
+  const chunks: string[] = []
+  let start = 0
+
+  while (start < content.length) {
+    const end = Math.min(start + chunkSize, content.length)
+    chunks.push(content.substring(start, end))
+    start += chunkSize - overlap
+  }
+
+  return chunks
+}
+
+export async function createEmbeddings(texts: string[]): Promise<number[][]> {
+  const BATCH_SIZE = 100
+  const allEmbeddings: number[][] = []
+
+  for (let i = 0; i < texts.length; i += BATCH_SIZE) {
+    const batch = texts.slice(i, i + BATCH_SIZE)
+    const response = await openai.embeddings.create({
+      model: 'text-embedding-3-small',
+      input: batch,
+    })
+    allEmbeddings.push(...response.data.map(d => d.embedding))
+  }
+
+  return allEmbeddings
+}
+
+export async function buildIndex(filePath: string, chunkSize: number = 1200, overlap: number = 200): Promise<Chunk[]> {
+  const content = fs.readFileSync(filePath, 'utf-8')
+  const textChunks = await chunkDocument(content, chunkSize, overlap)
+  const embeddings = await createEmbeddings(textChunks)
+
+  const chunks: Chunk[] = textChunks.map((content, index) => ({
+    content,
+    embedding: embeddings[index],
+    index,
+  }))
+
+  return chunks
+}
+
+function cosineSimilarity(a: number[], b: number[]): number {
+  const dotProduct = a.reduce((sum, val, i) => sum + val * b[i], 0)
+  const magnitudeA = Math.sqrt(a.reduce((sum, val) => sum + val * val, 0))
+  const magnitudeB = Math.sqrt(b.reduce((sum, val) => sum + val * val, 0))
+  return dotProduct / (magnitudeA * magnitudeB)
+}
+
+export async function semanticSearch(query: string, chunks: Chunk[], topK: number = 5): Promise<Chunk[]> {
+  const queryEmbedding = await createEmbeddings([query])
+  const queryVec = queryEmbedding[0]
+
+  const scored = chunks.map(chunk => ({
+    chunk,
+    similarity: cosineSimilarity(queryVec, chunk.embedding),
+  }))
+
+  scored.sort((a, b) => b.similarity - a.similarity)
+  return scored.slice(0, topK).map(s => s.chunk)
+}
+
+export async function generateAnswer(
+  question: string,
+  context: string[],
+  chatHistory: Array<{ role: string; content: string }> = []
+): Promise<string> {
+  const contextText = context.join('\n\n---\n\n')
+  
+  const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [
+    {
+      role: 'system',
+      content: `You are a Rust and cryptography expert specializing in the MachinaIO diamond-io system.
+Answer every question using only the indexed knowledge provided in the context.
+Refer to exact functions, structs, and files when needed.
+If the answer is not in the context, say "I don't have enough information in the indexed codebase to answer that question."
+
+Context from codebase:
+${contextText}`,
+    },
+  ]
+
+  chatHistory.forEach(msg => {
+    messages.push({
+      role: msg.role === 'user' ? 'user' : 'assistant',
+      content: msg.content,
+    })
+  })
+
+  messages.push({
+    role: 'user',
+    content: question,
+  })
+
+  const response = await openai.chat.completions.create({
+    model: 'gpt-4o',
+    messages,
+    temperature: 0.3,
+    max_tokens: 1000,
+  })
+
+  return response.choices[0].message.content || 'No response generated'
+}

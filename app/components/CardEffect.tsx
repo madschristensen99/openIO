@@ -102,7 +102,16 @@ export default function CardEffect() {
       this.cardLine = cardLineRef.current!;
       this.speedIndicator = document.getElementById('speedValue');
 
-      this.position = 0;
+      // Calculate position so cards start from right and scroll left, approaching scanner but not reaching it
+      const scannerX = window.innerWidth / 2 + 10;
+      const cardStreamOffset = 45; // card-stream has translateX(45px)
+      const cardWidth = 400;
+      const approachDistance = 200; // Distance before scanner where first card should be
+      // Position cards so they start from right side, visible, but haven't reached scanner yet
+      // Cards move left (negative direction), so start them further right
+      // Position so the left edge of first card is approachDistance before scanner
+      this.position = scannerX - cardStreamOffset - approachDistance;
+      
       this.velocity = 120;
       this.direction = -1;
       this.isAnimating = true;
@@ -135,6 +144,7 @@ export default function CardEffect() {
       const cardGap = 60;
       const cardCount = this.cardLine.children.length;
       this.cardLineWidth = (cardWidth + cardGap) * cardCount;
+      // Note: cardLineWidth now includes duplicated cards for seamless looping
     }
 
     setupEventListeners() {
@@ -233,11 +243,13 @@ export default function CardEffect() {
     updateCardPosition() {
       const containerWidth = this.containerWidth;
       const cardLineWidth = this.cardLineWidth;
+      const singleSetWidth = cardLineWidth / 2; // Since we duplicated, each set is half
 
-      if (this.position < -cardLineWidth) {
-        this.position = containerWidth;
-      } else if (this.position > containerWidth) {
-        this.position = -cardLineWidth;
+      // Seamless infinite loop: when one set goes completely off screen, reset to show the duplicate
+      if (this.position <= -singleSetWidth) {
+        this.position += singleSetWidth;
+      } else if (this.position >= containerWidth) {
+        this.position = -singleSetWidth + containerWidth;
       }
 
       this.cardLine.style.transform = `translateX(${this.position}px)`;
@@ -634,6 +646,12 @@ export default function CardEffect() {
       if (!this.cardLine) return;
       this.cardLine.innerHTML = '';
       const cardsCount = 30;
+      // Create cards and duplicate them for seamless infinite loop
+      for (let i = 0; i < cardsCount; i++) {
+        const cardWrapper = this.createCardWrapper(i);
+        this.cardLine.appendChild(cardWrapper);
+      }
+      // Duplicate cards for seamless looping
       for (let i = 0; i < cardsCount; i++) {
         const cardWrapper = this.createCardWrapper(i);
         this.cardLine.appendChild(cardWrapper);

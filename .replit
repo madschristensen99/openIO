@@ -1,0 +1,43 @@
+modules = ["bash", "python-3.12", "go-1.21", "nodejs-20"]
+[agent]
+expertMode = true
+
+[nix]
+channel = "stable-25_05"
+
+[workflows]
+runButton = "Project"
+
+[[workflows.workflow]]
+name = "Project"
+mode = "parallel"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "0G RAG Agent"
+
+[[workflows.workflow]]
+name = "0G RAG Agent"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "cd 0g && npm run dev"
+waitForPort = 5000
+
+[workflows.workflow.metadata]
+outputType = "webview"
+
+[[ports]]
+localPort = 5000
+externalPort = 80
+
+[[ports]]
+localPort = 32995
+externalPort = 3000
+
+[deployment]
+deploymentTarget = "static"
+build = ["bash", "-c", "cd docs && npm run build"]
+publicDir = "docs/build"
