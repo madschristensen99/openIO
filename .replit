@@ -33,6 +33,10 @@ outputType = "webview"
 localPort = 5000
 externalPort = 80
 
+[[ports]]
+localPort = 32995
+externalPort = 3000
+
 [deployment]
 deploymentTarget = "static"
 build = ["bash", "-c", "cd docs && npm run build"]

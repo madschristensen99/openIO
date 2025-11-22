@@ -29,9 +29,16 @@ export async function POST() {
           chunks: chunks.length,
           rootHash: EMBEDDINGS_ROOT_HASH_ENV,
           message: 'Loaded pre-computed embeddings from 0G Storage',
+          source: '0g-storage'
         })
-      } catch (err) {
+      } catch (err: any) {
         console.warn('Failed to load from 0G, falling back to local indexing:', err)
+        if (!process.env.OPENAI_API_KEY) {
+          return NextResponse.json({
+            success: false,
+            error: 'Failed to download from 0G Storage and OPENAI_API_KEY is missing. Either provide a valid OPENAI_API_KEY for local indexing or check your EMBEDDINGS_0G_ROOT_HASH.',
+          }, { status: 500 })
+        }
       }
     }
 
@@ -58,8 +65,22 @@ export async function POST() {
         rootHash = await uploadJSONTo0G(chunks, `dio-embeddings-${Date.now()}.json`)
         uploadedTo0G = true
         console.log(`Uploaded to 0G Storage with root hash: ${rootHash}`)
-      } catch (err) {
+      } catch (err: any) {
         console.warn('Failed to upload to 0G Storage:', err)
+        const uploadError = err.message || 'Unknown error'
+        fs.writeFileSync(metaPath, JSON.stringify({ 
+          rootHash: 'local-only', 
+          chunks: chunks.length,
+          source: 'local-only',
+          uploadError
+        }))
+        
+        return NextResponse.json({
+          success: true,
+          chunks: chunks.length,
+          message: `Indexed locally, but failed to upload to 0G Storage: ${uploadError}`,
+          uploadError
+        })
       }
     }
 
