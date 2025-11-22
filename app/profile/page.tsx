@@ -49,31 +49,67 @@ export default function ProfilePage() {
       <Navbar />
       <div className="profile-page">
         <div className="profile-container">
-          <div className="profile-header">
-            <div className="profile-avatar">
-              {currentUser[0].toUpperCase()}
-            </div>
-            <div className="profile-info">
-              <h1 className="profile-name">{currentUser}</h1>
-              <p className="profile-bio">Privacy computation developer</p>
-            </div>
-          </div>
+          <div className="profile-main-layout">
+            <div className="profile-left">
+              <div className="profile-header">
+                <div className="profile-avatar">
+                  {currentUser[0].toUpperCase()}
+                </div>
+                <div className="profile-info">
+                  <h1 className="profile-name">{currentUser}</h1>
+                  <p className="profile-bio">Privacy computation developer</p>
+                </div>
+              </div>
 
-          <div className="profile-stats">
-            <div className="stat-card">
-              <div className="stat-label">Total Revenue</div>
-              <div className="stat-value revenue">{totalStats.revenue}</div>
-              <div className="stat-description">From monetized models</div>
+              <div className="profile-stats">
+                <div className="stat-card">
+                  <div className="stat-label">Total Revenue</div>
+                  <div className="stat-value revenue">{totalStats.revenue}</div>
+                  <div className="stat-description">From monetized models</div>
+                </div>
+                <div className="stat-card">
+                  <div className="stat-label">Total Executions</div>
+                  <div className="stat-value">{totalStats.executions}</div>
+                  <div className="stat-description">Model runs</div>
+                </div>
+                <div className="stat-card">
+                  <div className="stat-label">Total Likes</div>
+                  <div className="stat-value">{totalStats.likes}</div>
+                  <div className="stat-description">Community engagement</div>
+                </div>
+              </div>
             </div>
-            <div className="stat-card">
-              <div className="stat-label">Total Executions</div>
-              <div className="stat-value">{totalStats.executions}</div>
-              <div className="stat-description">Model runs</div>
-            </div>
-            <div className="stat-card">
-              <div className="stat-label">Total Likes</div>
-              <div className="stat-value">{totalStats.likes}</div>
-              <div className="stat-description">Community engagement</div>
+
+            <div className="profile-right">
+              <div className="profile-settings">
+                <h3 className="settings-title">Settings</h3>
+                <div className="settings-list">
+                  <button className="settings-item">
+                    <span className="settings-label">Account Settings</span>
+                    <span className="settings-arrow">→</span>
+                  </button>
+                  <button className="settings-item">
+                    <span className="settings-label">Payment Methods</span>
+                    <span className="settings-arrow">→</span>
+                  </button>
+                  <button className="settings-item">
+                    <span className="settings-label">Notifications</span>
+                    <span className="settings-arrow">→</span>
+                  </button>
+                  <button className="settings-item">
+                    <span className="settings-label">API Keys</span>
+                    <span className="settings-arrow">→</span>
+                  </button>
+                  <button className="settings-item">
+                    <span className="settings-label">Privacy</span>
+                    <span className="settings-arrow">→</span>
+                  </button>
+                  <div className="settings-divider"></div>
+                  <button className="settings-item logout">
+                    <span className="settings-label">Logout</span>
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
 
