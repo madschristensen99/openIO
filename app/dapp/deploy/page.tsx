@@ -9,7 +9,7 @@ import AIChat from '../components/AIChat';
 
 export default function DeployPage() {
   const [selectedFile, setSelectedFile] = useState<string | null>('contract.io');
-  const [files, setFiles] = useState({
+  const [files, setFiles] = useState<Record<string, string>>({
     'contract.io': `// openIO Contract Example
 // This contract demonstrates sealed logic
 
