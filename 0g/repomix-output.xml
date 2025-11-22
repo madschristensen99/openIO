@@ -1,0 +1,5176 @@
+This file is a merged representation of the entire codebase, combined into a single document by Repomix.
+
+<file_summary>
+This section contains a summary of this file.
+
+<purpose>
+This file contains a packed representation of the entire repository's contents.
+It is designed to be easily consumable by AI systems for analysis, code review,
+or other automated processes.
+</purpose>
+
+<file_format>
+The content is organized as follows:
+1. This summary section
+2. Repository information
+3. Directory structure
+4. Repository files (if enabled)
+5. Multiple file entries, each consisting of:
+  - File path as an attribute
+  - Full contents of the file
+</file_format>
+
+<usage_guidelines>
+- This file should be treated as read-only. Any changes should be made to the
+  original repository files, not this packed version.
+- When processing this file, use the file path to distinguish
+  between different files in the repository.
+- Be aware that this file may contain sensitive information. Handle it with
+  the same level of security as you would the original repository.
+</usage_guidelines>
+
+<notes>
+- Some files may have been excluded based on .gitignore rules and Repomix's configuration
+- Binary files are not included in this packed representation. Please refer to the Repository Structure section for a complete list of file paths, including binary files
+- Files matching patterns in .gitignore are excluded
+- Files matching default ignore patterns are excluded
+- Files are sorted by Git change count (files with more changes are at the bottom)
+</notes>
+
+</file_summary>
+
+<directory_structure>
+.github/
+  workflows/
+    benchmark-self-hosted.yml
+    ci-self-hosted.yml
+dio/
+  src/
+    circuit.rs
+    config.rs
+    main.rs
+  build.rs
+  Cargo.toml
+  README.md
+e2e/
+  dio-config.1-plt.toml
+  dio-config.1.toml
+  dio-config.10.toml
+  dio-config.13.toml
+  dio-config.14.toml
+  dio-config.15.toml
+  dio-config.16.toml
+  dio-config.17.toml
+  dio-config.18.toml
+  dio-config.19.toml
+  dio-config.2-plt.toml
+  dio-config.2.toml
+  dio-config.20.toml
+  dio-config.21.toml
+  dio-config.22.toml
+  dio-config.3.toml
+  dio-config.4.toml
+  dio-config.5.toml
+  dio-config.6.toml
+  dio-config.7.toml
+  dio-config.8.toml
+  dio-config.dummy-plt.toml
+  dio-config.dummy.toml
+proptest-regressions/
+  poly/
+    dcrt/
+      sampler/
+        hash.txt
+        uniform.txt
+simulator/
+  environment.yml
+  main.py
+  norms.py
+  requirements.txt
+src/
+  io/
+    bgm.rs
+    composite_circuit.rs
+    eval.rs
+    mod.rs
+    obf.rs
+    params.rs
+    serde.rs
+    utils.rs
+  lib.rs
+  test_utils.rs
+  utils.rs
+tests/
+  test_io_dummy_param_width.rs
+  test_io_dummy_param.rs
+  test_io_final_circuit.rs
+  test_io_middle_param.rs
+  test_io_plt.rs
+  test_io_real_param.rs
+.gitignore
+.gitmodules
+.python-version
+build.rs
+Cargo.toml
+cloud-init.sh
+justfile
+LICENSE
+memory_profile.py
+monitor_cpu.sh
+pyproject.toml
+README.md
+run.sh
+rustfmt.toml
+</directory_structure>
+
+<files>
+This section contains the contents of the repository's files.
+
+<file path=".github/workflows/benchmark-self-hosted.yml">
+name: Bench
+
+on:
+  workflow_dispatch:
+    inputs:
+      param_id:
+        description: 'Configuration ID (e.g. 36)'
+        required: true
+        default: '36'
+      data_id:
+        description: 'Data ID (e.g. 53)'
+        required: true
+        default: '53'
+      bench_type:
+        description: 'Benchmark type'
+        required: true
+        type: choice
+        options:
+          - add-mul
+          - plt
+        default: 'add-mul'
+      add_num:
+        description: 'Number of additions (add-mul only)'
+        required: false
+        default: '0'
+      mul_num:
+        description: 'Number of multiplications (add-mul only)'
+        required: false
+        default: '0'
+      t_num:
+        description: 't parameter (plt only)'
+        required: false
+        default: '0'
+
+env:
+  CARGO_TERM_COLOR: always
+
+permissions:
+  id-token: write
+  contents: read
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref }}
+  cancel-in-progress: true
+
+jobs:
+  launch-ec2:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::490752553772:role/machina-io-assume_role-slc
+          role-duration-seconds: 900
+          aws-region: us-west-2
+
+      - name: Launch EC2 Instance
+        id: launch-ec2
+        env:
+          GH_REPO: ${{ github.repository }}
+          GH_PAT: ${{ secrets.GH_PAT }}
+          IMAGE_ID: ami-075686beab831bb7f
+          INSTANCE_TYPE: i4i.16xlarge
+          SG: sg-02014faf3d99151dd
+        run: |
+          ./run.sh ${{ github.run_id }}
+
+  bench:
+    needs: launch-ec2
+    runs-on: ["${{github.run_id}}", self-hosted]
+    timeout-minutes: 5760 #4days
+    strategy:
+      fail-fast: false
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@nightly
+        with:
+          components: clippy
+
+      - name: Cache Rust artifacts
+        uses: Swatinem/rust-cache@v2
+
+      - name: Raid configuration
+        run: |
+          sudo mdadm --create --verbose /dev/md0 --level=0 --name=MY_RAID --chunk=64 --raid-devices=2 /dev/nvme1n1 /dev/nvme2n1
+          sudo mkfs.ext4 -L MY_RAID /dev/md0
+          sudo mount /dev/md0 /tmp
+          sudo chown -R ubuntu /tmp/
+
+      - name: Install build deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential cmake libgmp-dev libasound2-dev
+
+      - name: Check for OpenFHE
+        id: openfhe-check
+        run: |
+          if ldconfig -p | grep -q 'libOpenFHE'; then
+            echo "installed=true" >> $GITHUB_OUTPUT
+          else
+            echo "installed=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Checkout OpenFHE
+        if: steps.openfhe-check.outputs.installed == 'false'
+        uses: actions/checkout@v4
+        with:
+          repository: MachinaIO/openfhe-development
+          ref: feat/improve_determinant
+          path: openfhe
+
+      - name: Build & install OpenFHE
+        if: steps.openfhe-check.outputs.installed == 'false'
+        run: |
+          cd openfhe
+          mkdir -p build && cd build
+          cmake ..
+          make -j"$(nproc)"
+          sudo make install
+          echo "/usr/local/lib" | sudo tee /etc/ld.so.conf.d/openfhe.conf
+          sudo ldconfig
+
+      - name: Verify OpenFHE install
+        run: ls -lah /usr/local/lib | grep OpenFHE
+
+      - name: Install dio
+        run: cargo install --path dio
+
+      - name: Verify dio
+        run: which dio
+
+      - name: Run benchmarks (stream + log)
+        env:
+          LD_LIBRARY_PATH: /usr/local/lib
+          RUST_LOG: info
+        run: |
+          mkdir -p logs
+
+          case "${{ github.event.inputs.bench_type }}" in
+            "add-mul")
+              BENCH_FLAGS="--bench-type add-mul \
+                            --add-num ${{ github.event.inputs.add_num }} \
+                            --mul-num ${{ github.event.inputs.mul_num }}"
+              ;;
+            "plt")
+              BENCH_FLAGS="--bench-type plt \
+                            --t-num ${{ github.event.inputs.t_num }}"
+              ;;
+            *)
+              echo "Unknown bench_type"; exit 1
+              ;;
+          esac
+          echo "Using flags: $BENCH_FLAGS"
+
+          (
+            dio run-bench \
+              -c e2e/dio-config.${{ github.event.inputs.param_id }}.toml \
+              -o /tmp/data_${{ github.event.inputs.data_id }}_param_${{ github.event.inputs.param_id }} \
+              $BENCH_FLAGS \
+            2>&1 | tee logs/data_${{ github.event.inputs.data_id }}_param_${{ github.event.inputs.param_id }}.log
+          ) &
+          pid=$!
+          echo "Benchmark PID: $pid"
+          wait $pid
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+
+      - name: Install the project
+        run: uv sync --locked --all-extras --dev
+
+      - name: Upload benchmark logs
+        uses: actions/upload-artifact@v4
+        with:
+          name: bench-logs
+          path: logs/*.log
+
+      - name: Run memory profiling
+        run: |
+          LOG=logs/data_${{ github.event.inputs.data_id }}_param_${{ github.event.inputs.param_id }}.log
+          uv run memory_profile.py --log-file "$LOG"
+
+      - name: Upload memory analysis
+        uses: actions/upload-artifact@v4
+        with:
+          name: memory-analysis
+          path: logs/combined_memory_analysis_*.txt
+
+      - name: Clean up logs
+        if: always()
+        run: rm -rf logs
+</file>
+
+<file path=".github/workflows/ci-self-hosted.yml">
+name: CI self-hosted runner
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+env:
+  CARGO_TERM_COLOR: always
+
+permissions:
+  id-token: write
+  contents: read
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  fmt:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@nightly
+        with:
+          components: rustfmt
+      - run: cargo +nightly fmt --all --check
+
+  launch-ec2:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5760 #4days
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::490752553772:role/machina-io-assume_role-slc
+          role-duration-seconds: 900
+          aws-region: us-west-2
+
+      - name: Launch EC2 Instance
+        id: launch-ec2
+        env:
+          GH_REPO: ${{ github.repository }}
+          GH_PAT: ${{ secrets.GH_PAT }}
+          IMAGE_ID: ami-075686beab831bb7f
+          INSTANCE_TYPE: c7i.4xlarge
+          SG: sg-02014faf3d99151dd
+        run: |
+          ./run.sh ${{ github.run_id }}
+
+  run-on-self-hosted:
+    needs: launch-ec2
+    runs-on: ["${{github.run_id}}", self-hosted]
+    strategy:
+        fail-fast: false
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@nightly
+        with:
+          components: clippy
+
+      - name: Cache Rust artifacts
+        uses: Swatinem/rust-cache@v2
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential cmake libgmp-dev libasound2-dev
+
+      - name: Checkout OpenFHE
+        uses: actions/checkout@v4
+        with:
+          repository: MachinaIO/openfhe-development
+          ref: feat/improve_determinant
+          path: openfhe
+
+
+      - name: Build OpenFHE
+        run: |
+          cd openfhe
+          mkdir -p build && cd build
+          cmake ..
+          make -j"$(nproc)"
+          sudo make install
+
+      - name: Update dynamic linker cache
+        run: |
+          echo "/usr/local/lib" | sudo tee /etc/ld.so.conf.d/openfhe.conf
+          sudo ldconfig
+
+      - name: Verify OpenFHE installation
+        run: ls -lah /usr/local/lib | grep OpenFHE
+
+      - name: Run clippy memory
+        run: cargo +nightly clippy --workspace --all-targets
+        env:
+          RUSTFLAGS: -A unused
+
+      - name: Run clippy disk
+        run: cargo +nightly clippy --workspace --all-targets --no-default-features --features disk
+        env:
+          RUSTFLAGS: -A unused
+
+      - name: Run test
+        run: cargo test
+  
+  ci-success:
+    name: ci success
+    runs-on: ubuntu-latest
+    if: always()
+    needs:
+      - run-on-self-hosted
+      - fmt
+    steps:
+      - name: Decide whether the needed jobs succeeded or failed
+        uses: re-actors/alls-green@release/v1
+        with:
+          jobs: ${{ toJSON(needs) }}
+</file>
+
+<file path="dio/src/circuit.rs">
+use mxx::{circuit::PolyCircuit, lookup::PublicLut, poly::dcrt::poly::DCRTPoly};
+
+pub enum BenchCircuit {
+    AddMul(PolyCircuit<DCRTPoly>),
+    AddMulVerify(PolyCircuit<DCRTPoly>),
+    Plt(PolyCircuit<DCRTPoly>),
+    PltVerify(PolyCircuit<DCRTPoly>),
+}
+
+impl BenchCircuit {
+    pub fn new_add_mul(add_n: usize, mul_n: usize, log_base_q: usize) -> Self {
+        let mut public_circuit = PolyCircuit::new();
+
+        // inputs: BaseDecompose(ct), eval_input
+        // outputs: BaseDecompose(ct) * acc
+        {
+            let inputs = public_circuit.input((2 * log_base_q) + 1);
+            let mut outputs = vec![];
+            let eval_input = inputs[2 * log_base_q];
+
+            // compute acc according to add_n and mul_n logic
+            let mut acc = if add_n == 0 {
+                public_circuit.const_one_gate()
+            } else {
+                public_circuit.const_zero_gate()
+            };
+            for _ in 0..add_n {
+                acc = public_circuit.add_gate(acc, eval_input);
+            }
+            for _ in 0..mul_n {
+                acc = public_circuit.mul_gate(acc, eval_input);
+            }
+
+            // compute the output
+            for ct_input in inputs[0..2 * log_base_q].iter() {
+                let muled = public_circuit.mul_gate(*ct_input, acc);
+                outputs.push(muled);
+            }
+            public_circuit.output(outputs);
+        }
+
+        Self::AddMul(public_circuit)
+    }
+
+    pub fn new_add_mul_verify(add_n: usize, mul_n: usize) -> Self {
+        let mut public_circuit = PolyCircuit::new();
+        {
+            let inputs = public_circuit.input(2);
+            let mut outputs = vec![];
+            let eval_input = inputs[1];
+
+            // compute acc according to add_n and mul_n logic
+            let mut acc = if add_n == 0 {
+                public_circuit.const_one_gate()
+            } else {
+                public_circuit.const_zero_gate()
+            };
+            for _ in 0..add_n {
+                acc = public_circuit.add_gate(acc, eval_input);
+            }
+            for _ in 0..mul_n {
+                acc = public_circuit.mul_gate(acc, eval_input);
+            }
+
+            // compute the output
+            for ct_input in inputs[0..1].iter() {
+                let muled = public_circuit.mul_gate(*ct_input, acc);
+                outputs.push(muled);
+            }
+            public_circuit.output(outputs);
+        }
+
+        Self::AddMulVerify(public_circuit)
+    }
+
+    pub fn new_plt(log_base_q: usize, lut: PublicLut<DCRTPoly>) -> Self {
+        let mut public_circuit = PolyCircuit::new();
+
+        // inputs: BaseDecompose(ct), eval_input
+        // outputs: BaseDecompose(ct) * acc
+        {
+            let inputs = public_circuit.input((2 * log_base_q) + 1);
+            let mut outputs = vec![];
+            let eval_input = inputs[2 * log_base_q];
+
+            // register and call lookup
+            let plt_id = public_circuit.register_public_lookup(lut);
+            let plt_out = public_circuit.public_lookup_gate(eval_input, plt_id);
+
+            // compute the output
+            for ct_input in inputs[0..2 * log_base_q].iter() {
+                let muled = public_circuit.mul_gate(*ct_input, plt_out);
+                outputs.push(muled);
+            }
+            public_circuit.output(outputs);
+        }
+
+        Self::Plt(public_circuit)
+    }
+
+    pub fn new_plt_verify() -> Self {
+        let mut public_circuit = PolyCircuit::new();
+
+        // inputs: BaseDecompose(ct), eval_input
+        // outputs: BaseDecompose(ct) * acc
+        {
+            let inputs = public_circuit.input(2);
+            let mut outputs = vec![];
+            let eval_input = inputs[1];
+
+            // compute the output
+            for ct_input in inputs[0..1].iter() {
+                let muled = public_circuit.mul_gate(*ct_input, eval_input);
+                outputs.push(muled);
+            }
+            public_circuit.output(outputs);
+        }
+
+        Self::PltVerify(public_circuit)
+    }
+
+    pub fn as_poly_circuit(self) -> PolyCircuit<DCRTPoly> {
+        match self {
+            BenchCircuit::AddMul(poly_circuit) => poly_circuit,
+            BenchCircuit::AddMulVerify(poly_circuit) => poly_circuit,
+            BenchCircuit::Plt(poly_circuit) => poly_circuit,
+            BenchCircuit::PltVerify(poly_circuit) => poly_circuit,
+        }
+    }
+}
+</file>
+
+<file path="dio/src/config.rs">
+use std::str::FromStr;
+
+use num_bigint::BigUint;
+use serde::{Deserialize, Deserializer, Serialize, Serializer, de};
+
+fn biguint_to_string<S>(value: &BigUint, serializer: S) -> Result<S::Ok, S::Error>
+where
+    S: Serializer,
+{
+    serializer.serialize_str(&value.to_str_radix(10))
+}
+
+fn biguint_from_string<'de, D>(deserializer: D) -> Result<BigUint, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let s = String::deserialize(deserializer)?;
+    BigUint::from_str(&s).map_err(de::Error::custom)
+}
+
+fn default_trapdoor_sigma() -> Option<f64> {
+    Some(4.578)
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RunBenchConfig {
+    #[serde(serialize_with = "biguint_to_string", deserialize_with = "biguint_from_string")]
+    pub switched_modulus: BigUint,
+    pub input_size: usize,
+    pub level_width: usize,
+    pub d: usize,
+    pub hardcoded_key_sigma: f64,
+    pub p_sigma: f64,
+    #[serde(default = "default_trapdoor_sigma")]
+    pub trapdoor_sigma: Option<f64>,
+    /// polynomial ring dimension
+    pub ring_dimension: u32,
+    /// size of the tower
+    pub crt_depth: usize,
+    /// number of bits of each tower's modulus
+    pub crt_bits: usize,
+    /// bit size of the base for the gadget vector and decomposition
+    pub base_bits: u32,
+    pub input: Vec<bool>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SimBenchNormConfig {
+    /// Log2 of the ring dimension
+    pub log_ring_dim: u32,
+    /// maximum size of the tower
+    pub max_crt_depth: usize,
+    /// number of bits of each tower's modulus
+    pub crt_bits: usize,
+    /// bit size of the base for the gadget vector and decomposition
+    pub base_bits: u32,
+    pub d: usize,
+}
+</file>
+
+<file path="dio/src/main.rs">
+use circuit::BenchCircuit;
+use clap::{Parser, Subcommand, ValueEnum};
+use config::{RunBenchConfig, SimBenchNormConfig};
+use diamond_io::{
+    io::{
+        eval::evaluate,
+        obf::obfuscate,
+        params::ObfuscationParams,
+        utils::{PublicSampledData, build_final_digits_circuit},
+    },
+    test_utils::setup_lsb_plt,
+    utils::{calculate_directory_size, init_tracing},
+};
+use mxx::{
+    bgg::public_key::BggPublicKey,
+    element::{PolyElem, finite_ring::FinRingElem},
+    lookup::poly::PolyPltEvaluator,
+    matrix::{PolyMatrix, dcrt_poly::DCRTPolyMatrix},
+    poly::{
+        Poly, PolyParams,
+        dcrt::{params::DCRTPolyParams, poly::DCRTPoly},
+    },
+    rlwe_enc::rlwe_encrypt,
+    sampler::{
+        DistType, PolyUniformSampler, hash::DCRTPolyHashSampler, trapdoor::DCRTPolyTrapdoorSampler,
+        uniform::DCRTPolyUniformSampler,
+    },
+};
+use num_traits::identities::One;
+
+use keccak_asm::Keccak256;
+use num_bigint::BigUint;
+use rand::Rng;
+use std::{
+    fs::{self},
+    path::{Path, PathBuf},
+    sync::Arc,
+};
+use tracing::info;
+
+pub mod circuit;
+pub mod config;
+
+/// Simple program to obfuscate and evaluate
+#[derive(Parser, Debug)]
+#[command(version, about, long_about = None)]
+struct Args {
+    #[command(subcommand)]
+    command: Commands,
+}
+
+#[derive(ValueEnum, Clone, Debug)]
+enum BenchType {
+    /// The original “add/mul” benchmark
+    AddMul,
+    /// The PLT benchmark
+    Plt,
+}
+
+#[derive(Subcommand, Debug)]
+enum Commands {
+    RunBench {
+        #[arg(short, long)]
+        config: PathBuf,
+
+        #[arg(short, long)]
+        obf_dir: PathBuf,
+
+        #[arg(short, long, default_value = "true")]
+        verify: bool,
+
+        #[arg(long, value_enum, default_value_t = BenchType::AddMul)]
+        bench_type: BenchType,
+
+        #[arg(long, requires_if("add_mul", "bench_type"))]
+        add_num: Option<usize>,
+
+        #[arg(long, requires_if("add_mul", "bench_type"))]
+        mul_num: Option<usize>,
+
+        #[arg(long, requires_if("plt", "bench_type"))]
+        t_num: Option<usize>,
+    },
+    SimBenchNorm {
+        #[arg(short, long)]
+        config: PathBuf,
+
+        #[arg(short, long)]
+        out_path: PathBuf,
+
+        #[arg(long, value_enum, default_value_t = BenchType::AddMul)]
+        bench_type: BenchType,
+
+        #[arg(long, requires_if("add_mul", "bench_type"))]
+        add_num: Option<usize>,
+
+        #[arg(long, requires_if("add_mul", "bench_type"))]
+        mul_num: Option<usize>,
+
+        #[arg(long, requires_if("plt", "bench_type"))]
+        t_num: Option<usize>,
+    },
+    BuildCircuit {
+        #[arg(short, long)]
+        config: PathBuf,
+
+        #[arg(long)]
+        add_num: usize,
+
+        #[arg(long)]
+        mul_num: usize,
+    },
+}
+
+#[tokio::main]
+async fn main() {
+    init_tracing();
+    let command = Args::parse().command;
+    match command {
+        Commands::RunBench { config, obf_dir, bench_type, add_num, mul_num, t_num, verify } => {
+            let contents = fs::read_to_string(&config).unwrap();
+            let dio_config: RunBenchConfig = toml::from_str(&contents).unwrap();
+            let dir = Path::new(&obf_dir);
+            if !dir.exists() {
+                fs::create_dir(dir).unwrap();
+            } else {
+                // Clean it first to ensure no old files interfere
+                fs::remove_dir_all(dir).unwrap();
+                fs::create_dir(dir).unwrap();
+            }
+            let start_time = std::time::Instant::now();
+            let params = DCRTPolyParams::new(
+                dio_config.ring_dimension,
+                dio_config.crt_depth,
+                dio_config.crt_bits,
+                dio_config.base_bits,
+            );
+            let log_base_q = params.modulus_digits();
+            let switched_modulus = Arc::new(dio_config.switched_modulus);
+            let (public_circuit, plt) = match bench_type {
+                BenchType::AddMul => {
+                    let add_num = add_num.unwrap();
+                    let mul_num = mul_num.unwrap();
+                    (
+                        BenchCircuit::new_add_mul(add_num, mul_num, log_base_q).as_poly_circuit(),
+                        None,
+                    )
+                }
+                BenchType::Plt => {
+                    let t_num = t_num.unwrap();
+                    let plt = setup_lsb_plt(t_num, &params);
+                    (BenchCircuit::new_plt(log_base_q, plt.clone()).as_poly_circuit(), Some(plt))
+                }
+            };
+
+            let obf_params = ObfuscationParams {
+                params,
+                switched_modulus,
+                input_size: dio_config.input_size,
+                level_width: dio_config.level_width,
+                public_circuit,
+                d: dio_config.d,
+                hardcoded_key_sigma: dio_config.hardcoded_key_sigma,
+                p_sigma: dio_config.p_sigma,
+                trapdoor_sigma: dio_config.trapdoor_sigma.unwrap_or_default(),
+            };
+            let sampler_uniform = DCRTPolyUniformSampler::new();
+            let mut rng = rand::rng();
+            let hardcoded_key = sampler_uniform.sample_poly(&obf_params.params, &DistType::BitDist);
+            let _ = obfuscate::<
+                DCRTPolyMatrix,
+                DCRTPolyUniformSampler,
+                DCRTPolyHashSampler<Keccak256>,
+                DCRTPolyTrapdoorSampler,
+                _,
+                _,
+            >(obf_params.clone(), hardcoded_key.clone(), &mut rng, &obf_dir)
+            .await;
+            let obfuscation_time = start_time.elapsed();
+            info!("Time to obfuscate: {:?}", obfuscation_time);
+
+            let obf_size = calculate_directory_size(&obf_dir);
+            info!("Obfuscation size: {obf_size} bytes");
+
+            let input = dio_config.input;
+            assert_eq!(input.len(), dio_config.input_size);
+
+            let start_time = std::time::Instant::now();
+            let output = evaluate::<
+                DCRTPolyMatrix,
+                DCRTPolyHashSampler<Keccak256>,
+                DCRTPolyTrapdoorSampler,
+                _,
+            >(obf_params.clone(), &input, &obf_dir);
+            let eval_time = start_time.elapsed();
+            let total_time = obfuscation_time + eval_time;
+            info!("Time for evaluation: {:?}", eval_time);
+            info!("Total time: {:?}", total_time);
+            if verify {
+                let input_poly = DCRTPoly::from_bool_vec(&obf_params.params, &input);
+                let eval = match bench_type {
+                    BenchType::AddMul => {
+                        let add_num = add_num.unwrap();
+                        let mul_num = mul_num.unwrap();
+                        let verify_circuit =
+                            BenchCircuit::new_add_mul_verify(add_num, mul_num).as_poly_circuit();
+                        verify_circuit.eval(
+                            &obf_params.params,
+                            &DCRTPoly::const_one(&obf_params.params),
+                            &[hardcoded_key, input_poly],
+                            None::<PolyPltEvaluator>,
+                        )
+                    }
+                    BenchType::Plt => {
+                        let plt = plt.unwrap();
+                        let (_, y_k) =
+                            plt.f.get(&input_poly).expect("x_k doesn't exist on the PLT");
+                        let verify_circuit = BenchCircuit::new_plt_verify().as_poly_circuit();
+                        verify_circuit.eval(
+                            &obf_params.params,
+                            &DCRTPoly::const_one(&obf_params.params),
+                            &[hardcoded_key, y_k.clone()],
+                            Some(PolyPltEvaluator::new()),
+                        )
+                    }
+                };
+
+                assert_eq!(eval.len(), 1);
+                /*
+                    Since we are computing b' - a' * t in the decryption part of the final circuit,
+                    where a' = acc * a and b' = acc * b are the outputs of the public circuit,
+                    b' - a' * t = acc * b - acc * a * t = acc * (a * t + e + [q/2] x - a*t) = acc * (e + [q/2] x) should hold,
+                    where e is the LWE error and x is the hardcoded key.
+                    If e = 0, it follows that b' - a' * t = acc * [q/2] x.
+                */
+                let half_q = FinRingElem::half_q(&obf_params.params.modulus());
+                for e in eval {
+                    let expected_output =
+                        (DCRTPoly::from_elem_to_constant(&obf_params.params, &half_q) * e)
+                            .extract_bits_with_threshold(&obf_params.params);
+                    assert_eq!(output, expected_output);
+                }
+            }
+        }
+        Commands::SimBenchNorm { config, out_path, add_num, mul_num, t_num, bench_type } => {
+            let dio_config: SimBenchNormConfig =
+                serde_json::from_reader(fs::File::open(&config).unwrap()).unwrap();
+            let log_n = dio_config.log_ring_dim;
+            let n = 2u32.pow(log_n);
+            let max_crt_depth = dio_config.max_crt_depth;
+            let crt_bits = dio_config.crt_bits;
+            let base_bits = dio_config.base_bits;
+            let params = DCRTPolyParams::new(n, max_crt_depth, crt_bits, base_bits);
+            let log_q = params.modulus_bits();
+            debug_assert_eq!(crt_bits * max_crt_depth, log_q);
+            let log_base_q = params.modulus_digits();
+
+            let public_circuit = match bench_type {
+                BenchType::AddMul => {
+                    let add_num = add_num.unwrap();
+                    let mul_num = mul_num.unwrap();
+                    BenchCircuit::new_add_mul(add_num, mul_num, log_base_q).as_poly_circuit()
+                }
+                BenchType::Plt => {
+                    let t_num = t_num.unwrap();
+                    let plt = setup_lsb_plt(t_num, &params);
+                    BenchCircuit::new_plt(log_base_q, plt.clone()).as_poly_circuit()
+                }
+            };
+            let a_rlwe_bar = DCRTPoly::const_max(&params);
+            let b = DCRTPoly::const_max(&params);
+
+            let a_decomposed_polys = a_rlwe_bar.decompose_base(&params);
+            let b_decomposed_polys = b.decompose_base(&params);
+            let final_circuit = build_final_digits_circuit::<DCRTPoly, DCRTPoly>(
+                &a_decomposed_polys,
+                &b_decomposed_polys,
+                public_circuit,
+            );
+
+            let packed_input_norms = vec![BigUint::one(), params.modulus().as_ref().clone()];
+            let norms = final_circuit.simulate_bgg_norm(
+                params.ring_dimension(),
+                params.base_bits(),
+                packed_input_norms,
+            );
+            let norm_json = serde_json::to_string(&norms).unwrap();
+            fs::write(out_path, norm_json.as_bytes()).unwrap()
+        }
+        Commands::BuildCircuit { config, add_num, mul_num } => {
+            let contents = fs::read_to_string(&config).unwrap();
+            let dio_config: RunBenchConfig = toml::from_str(&contents).unwrap();
+            let params = DCRTPolyParams::new(
+                dio_config.ring_dimension,
+                dio_config.crt_depth,
+                dio_config.crt_bits,
+                dio_config.base_bits,
+            );
+            let log_base_q = params.modulus_digits();
+            let switched_modulus = Arc::new(dio_config.switched_modulus);
+            let public_circuit =
+                BenchCircuit::new_add_mul(add_num, mul_num, log_base_q).as_poly_circuit();
+            let obf_params = ObfuscationParams {
+                params,
+                switched_modulus,
+                input_size: dio_config.input_size,
+                level_width: dio_config.level_width,
+                public_circuit,
+                d: dio_config.d,
+                hardcoded_key_sigma: dio_config.hardcoded_key_sigma,
+                p_sigma: dio_config.p_sigma,
+                trapdoor_sigma: dio_config.trapdoor_sigma.unwrap_or_default(),
+            };
+            let sampler_uniform = DCRTPolyUniformSampler::new();
+            let mut rng = rand::rng();
+            let hardcoded_key = sampler_uniform.sample_poly(&obf_params.params, &DistType::BitDist);
+            let hash_key = rng.random::<[u8; 32]>();
+            let public_data =
+                PublicSampledData::<DCRTPolyHashSampler<Keccak256>>::sample(&obf_params, hash_key);
+            let hardcoded_key_matrix =
+                DCRTPolyMatrix::from_poly_vec_row(&obf_params.params, vec![hardcoded_key.clone()]);
+            let t_bar_matrix =
+                sampler_uniform.sample_uniform(&obf_params.params, 1, 1, DistType::FinRingDist);
+            let a = public_data.a_rlwe_bar;
+            let b = rlwe_encrypt(
+                &obf_params.params,
+                &sampler_uniform,
+                &t_bar_matrix,
+                &a,
+                &hardcoded_key_matrix,
+                obf_params.hardcoded_key_sigma,
+            );
+            let a_decomposed = a.entry(0, 0).decompose_base(&obf_params.params);
+            let b_decomposed = b.entry(0, 0).decompose_base(&obf_params.params);
+            let final_circuit = build_final_digits_circuit::<DCRTPoly, BggPublicKey<DCRTPolyMatrix>>(
+                &a_decomposed,
+                &b_decomposed,
+                obf_params.public_circuit,
+            );
+            info!("Final Circuit: {:?}", final_circuit.count_gates_by_type_vec());
+        }
+    }
+}
+</file>
+
+<file path="dio/build.rs">
+fn main() {
+    println!("cargo::rerun-if-changed=src/main.rs");
+
+    // linking openFHE
+    println!("cargo::rustc-link-arg=-L/usr/local/lib");
+    println!("cargo::rustc-link-arg=-lOPENFHEpke");
+    println!("cargo::rustc-link-arg=-lOPENFHEbinfhe");
+    println!("cargo::rustc-link-arg=-lOPENFHEcore");
+
+    // linking OpenMP
+    println!("cargo::rustc-link-arg=-fopenmp");
+
+    // necessary to avoid LD_LIBRARY_PATH
+    println!("cargo::rustc-link-arg=-Wl,-rpath,/usr/local/lib");
+}
+</file>
+
+<file path="dio/Cargo.toml">
+[package]
+name = "dio"
+version = "0.1.0"
+edition = "2024"
+
+[features]
+debug = ["diamond-io/debug"]
+disk = ["diamond-io/disk"]
+
+[dependencies]
+mxx = { git = "https://github.com/MachinaIO/mxx.git" }
+diamond-io = { path = "../", default-features = false }
+clap = { version = "4.5.36", features = ["derive"] }
+num-bigint = { version = "0.4", features = ["serde"] }
+rand = { version = "0.9.0", features = ["std_rng"] }
+keccak-asm = { version = "0.1.4" }
+tracing = "0.1"
+serde = { version = "1.0", features = ["derive"] }
+toml = "0.8.20"
+serde_json = "1.0.48"
+tokio = { version = "1", features = ["macros"] }
+num-traits = "0.2"
+</file>
+
+<file path="dio/README.md">
+# dio
+
+diamond-io CLI implementation
+
+### install
+```
+cargo install --path .
+```
+disk feature enable
+```
+cargo install --features disk --path .
+```
+debug feature enable
+```
+cargo install --features debug --path .
+```
+
+### Run AddMul
+
+Execute the end-to-end workflow from obfuscation to evaluation for AddMul circuit:
+
+```
+dio run-bench \
+  -c {CONFIG-TOML-PATH} \
+  -o {OBFUSCATION-DIRECTORY-PATH} \
+  --add-num {ADD-GATE-NUMBER} \
+  --mul-num {MUL-GATE-NUMBER}
+```
+
+### Run Plt
+
+Execute the end-to-end workflow from obfuscation to evaluation for Plt circuit:
+
+```
+dio run-bench \
+  -c {CONFIG-TOML-PATH} \
+  -o {OBFUSCATION-DIRECTORY-PATH} \
+  --t-num {TABLE-ROW-NUMBER} \
+```
+
+### Build Circuit
+
+Build the final circuit from the specified gate numbers and configuration, and count its gate types:
+
+```
+dio build-circuit \
+  -c {CONFIG-TOML-PATH} \
+  --add-num {ADD-GATE-NUMBER} \
+  --mul-num {MUL-GATE-NUMBER}
+```
+</file>
+
+<file path="e2e/dio-config.1-plt.toml">
+ring_dimension = 8192
+crt_depth = 12
+crt_bits = 51
+base_bits = 20
+switched_modulus = "8524454708062869453159348168821872785817751715542733954989196254784265452049976173122863738487332862983148628669230228634962540665568139330505932800"
+d = 1
+input_size = 4
+level_width = 1
+hardcoded_key_sigma = 7.4392e106
+p_sigma = 1.1672e1
+input = [true, true, false, false]
+</file>
+
+<file path="e2e/dio-config.1.toml">
+ring_dimension = 8192
+crt_depth = 6
+crt_bits = 51
+base_bits = 17
+switched_modulus = "7286787346663540544401205006872800924021905474424898872905693286510586401192117719085"
+d = 1
+input_size = 1
+level_width = 1
+hardcoded_key_sigma = 4.0616e19
+p_sigma = 1.2057e1
+input = [true]
+</file>
+
+<file path="e2e/dio-config.10.toml">
+ring_dimension = 8192
+crt_depth = 8
+crt_bits = 51
+base_bits = 17
+switched_modulus = "406026389175099089415265236309494229122908249194395430538326938167436430866085637879283152597629600732479834087398"
+d = 1
+input_size = 2
+level_width = 1
+hardcoded_key_sigma = 4.6889e60
+p_sigma = 1.3842e1
+input = [true, false]
+</file>
+
+<file path="e2e/dio-config.13.toml">
+ring_dimension = 8192
+crt_depth = 12
+crt_bits = 51
+base_bits = 17
+switched_modulus = "8524454708062869453159348168821872792230814197585243995183280755660798539209804823315298070433388874966147279404842741081883858723676703069053124608"
+d = 1
+input_size = 4
+level_width = 1
+hardcoded_key_sigma = 7.4392e106
+p_sigma = 1.1672e1
+input = [true, false, false, false]
+</file>
+
+<file path="e2e/dio-config.14.toml">
+ring_dimension = 8192
+crt_depth = 13
+crt_bits = 51
+base_bits = 17
+switched_modulus = "43224120509177009984504248580116261988696787396302730653801900169371003795398588067098194796695366034374010622637324099517037347444558866761898783714270903349775339202330735498581"
+d = 1
+input_size = 4
+level_width = 1
+hardcoded_key_sigma = 3.1293e137
+p_sigma = 1.2506e1
+input = [true, false, false, false]
+</file>
+
+<file path="e2e/dio-config.15.toml">
+ring_dimension = 8192
+crt_depth = 16
+crt_bits = 51
+base_bits = 17
+switched_modulus = "493532210127737978346818125553926644406912547773689913571351121568510114645445830712961187089734920813151895730816257575394484622381720832002608602371028037405299376890828460930374339794578005449323698628590821891127136747520"
+d = 1
+input_size = 4
+level_width = 1
+hardcoded_key_sigma = 3.1632e183
+p_sigma = 1.3870e1
+input = [true, false, false, false]
+</file>
+
+<file path="e2e/dio-config.16.toml">
+ring_dimension = 8192
+crt_depth = 8
+crt_bits = 51
+base_bits = 17
+switched_modulus = "50102241765841775528308919398132999550888223782006245012205908586806543047679108148033443776867031316430848000"
+d = 1
+input_size = 2
+level_width = 1
+hardcoded_key_sigma = 4.6889e60
+p_sigma = 1.3842e1
+input = [true, false]
+</file>
+
+<file path="e2e/dio-config.17.toml">
+ring_dimension = 8192
+crt_depth = 9
+crt_bits = 51
+base_bits = 17
+switched_modulus = "924223231373604953192804728047694567768688924296803155216433018852140368499443881948451495354475529779570269258850007544412241920"
+d = 1
+input_size = 1
+level_width = 1
+hardcoded_key_sigma = 1.7400e76
+p_sigma = 1.4832e1
+input = [true]
+</file>
+
+<file path="e2e/dio-config.18.toml">
+ring_dimension = 8192
+crt_depth = 10
+crt_bits = 51
+base_bits = 17
+switched_modulus = "254048547388996763621549253726657413440301742477997903588967657264650360458743117227134327818548835044839748589109118574271808442400184991744"
+d = 1
+input_size = 2
+level_width = 1
+hardcoded_key_sigma = 3.3306e91
+p_sigma = 1.5892e1
+input = [true, false]
+</file>
+
+<file path="e2e/dio-config.19.toml">
+ring_dimension = 8192
+crt_depth = 12
+crt_bits = 51
+base_bits = 17
+switched_modulus = "19195365523384304566658297632793049395549577752352142918542463356858453858937484107332411165528176095136463725263356996893713495348780390573098918562099220858972842"
+d = 1
+input_size = 4
+level_width = 1
+hardcoded_key_sigma = 1.2787e122
+p_sigma = 1.2081e1
+input = [true, false, false, false]
+</file>
+
+<file path="e2e/dio-config.2-plt.toml">
+ring_dimension = 8192
+crt_depth = 8
+crt_bits = 51
+base_bits = 20
+switched_modulus = "410437564545775825127906667709829310469578261604595364945355278564225277895074840557036105996440375783467318072661"
+d = 1
+input_size = 1
+level_width = 1
+hardcoded_key_sigma = 4.6889e60
+p_sigma = 1.3842e1
+input = [true]
+</file>
+
+<file path="e2e/dio-config.2.toml">
+ring_dimension = 8192
+crt_depth = 9
+crt_bits = 51
+base_bits = 17
+switched_modulus = "83200403422116173368741278375458394498231852609884475689369279479313515475798567667964495026807146600066937248170908142553903952967"
+d = 1
+input_size = 1
+level_width = 1
+hardcoded_key_sigma = 6.0878e65
+p_sigma = 1.4832e1
+input = [true]
+</file>
+
+<file path="e2e/dio-config.20.toml">
+ring_dimension = 8192
+crt_depth = 9
+crt_bits = 51
+base_bits = 17
+switched_modulus = "924223231373604953192804728047694567768688924296803155216433018852140368499443881948451495354475529779570269258850007544412241920"
+d = 1
+input_size = 4
+level_width = 4
+hardcoded_key_sigma = 1.7400e76
+p_sigma = 1.4832e1
+input = [true, false, false, false]
+</file>
+
+<file path="e2e/dio-config.21.toml">
+ring_dimension = 8192
+crt_depth = 17
+crt_bits = 51
+base_bits = 17
+switched_modulus = "246766105063868989173409062776963322200558384998036675495225167529304788492012655306161907371891293188554546042807318951312371698831769433391844119508553109162918751579181059766968828893138502132456305900617505542526459707392"
+d = 1
+input_size = 8
+level_width = 1
+hardcoded_key_sigma = 1.0434e199
+p_sigma = 1.4358e1
+input = [true, false, false, false, false, false, false, false]
+</file>
+
+<file path="e2e/dio-config.22.toml">
+ring_dimension = 8192
+crt_depth = 10
+crt_bits = 51
+base_bits = 17
+switched_modulus = "254048547388996763621549253726657413440301742477997903588967657264650360458743117227134327818548835044839748589109118574271808442400184991744"
+d = 1
+input_size = 4
+level_width = 2
+hardcoded_key_sigma = 3.3306e91
+p_sigma = 1.5892e1
+input = [true, false, false, false]
+</file>
+
+<file path="e2e/dio-config.3.toml">
+ring_dimension = 8192
+crt_depth = 11
+crt_bits = 51
+base_bits = 17
+switched_modulus = "421876165349105594871610934258162204792537693428650133809753477951407650994052731692020064480897344010690482879847981627326888193405977828652204339526432699597220"
+d = 1
+input_size = 1
+level_width = 1
+hardcoded_key_sigma = 1.6183e96
+p_sigma = 1.1672e1
+input = [true]
+</file>
+
+<file path="e2e/dio-config.4.toml">
+ring_dimension = 8192
+crt_depth = 8
+crt_bits = 51
+base_bits = 17
+switched_modulus = "180311938347043771731066479866668162537142271101557880652064148521524784927733690683300335564125571"
+d = 1
+input_size = 2
+level_width = 1
+hardcoded_key_sigma = 1.0891e35
+p_sigma = 1.2919e1
+input = [true, false]
+</file>
+
+<file path="e2e/dio-config.5.toml">
+ring_dimension = 8192
+crt_depth = 9
+crt_bits = 51
+base_bits = 17
+switched_modulus = "110408181076655249961504992064971662862065499815081823843117806853583212826840241331741432668586818876958056224208770314268612"
+d = 1
+input_size = 4
+level_width = 1
+hardcoded_key_sigma = 6.0878e65
+p_sigma = 1.4832e1
+input = [true, false, false, false]
+</file>
+
+<file path="e2e/dio-config.6.toml">
+ring_dimension = 8192
+crt_depth = 13
+crt_bits = 51
+base_bits = 17
+switched_modulus = "41395659052758419312752173864946651673810524927283854497307367044943900866106264205860882966040471990647935056155651247589121722466170392564431120230231705105429588047531484921043"
+d = 1
+input_size = 8
+level_width = 1
+hardcoded_key_sigma = 1.0428e127
+p_sigma = 1.2506e1
+input = [true, false, false, false, false, false, false, false]
+</file>
+
+<file path="e2e/dio-config.7.toml">
+ring_dimension = 8192
+crt_depth = 7
+crt_bits = 51
+base_bits = 17
+switched_modulus = "16408386389580983227527049674494097275616073811115261884330928631332138856973481574249644277662106020"
+d = 1
+input_size = 1
+level_width = 1
+hardcoded_key_sigma = 2.7782e45
+p_sigma = 1.2919e1
+input = [true]
+</file>
+
+<file path="e2e/dio-config.8.toml">
+ring_dimension = 8192
+crt_depth = 9
+crt_bits = 51
+base_bits = 17
+switched_modulus = "83200403422116173368741278375458394496275820525707818104758453741063009876345541548590270878503994944552084019434057822020055888007"
+d = 1
+input_size = 1
+level_width = 1
+hardcoded_key_sigma = 1.7400e76
+p_sigma = 1.4832e1
+input = [true]
+</file>
+
+<file path="e2e/dio-config.dummy-plt.toml">
+ring_dimension = 16
+crt_depth = 4
+crt_bits = 21
+base_bits = 10
+switched_modulus = "1"
+d = 3
+input_size = 3
+level_width = 1
+hardcoded_key_sigma = 0.0
+p_sigma = 0.0
+input = [false, true, true]
+</file>
+
+<file path="e2e/dio-config.dummy.toml">
+ring_dimension = 4
+crt_depth = 2
+crt_bits = 17
+base_bits = 10
+switched_modulus = "1"
+d = 3
+input_size = 4
+level_width = 1
+hardcoded_key_sigma = 0.0
+p_sigma = 0.0
+input = [true, false, false, false]
+</file>
+
+<file path="proptest-regressions/poly/dcrt/sampler/hash.txt">
+# Seeds for failure cases proptest has generated in the past. It is
+# automatically read and these particular cases re-run before any
+# novel cases are generated.
+#
+# It is recommended to check this file in to source control so that
+# everyone who runs the test benefits from these saved cases.
+cc e473a6f8b2710eee025ef03b6044d1d08df15bad5b59a751cbed277d96ecc7c8 # shrinks to rows = 2, columns = 1, key = [0, 0, 0, 0, 0, 0, 39, 145, 238, 162, 65, 7, 184, 228, 120, 120, 230, 13, 18, 57, 37, 216, 243, 9, 63, 168, 185, 5, 126, 203, 41, 29], tag = 11687662853182955831
+cc 85edb5cf6ed26f77294a5205b166a68fa7801c072276a79d0c2226fa656fe7dd # shrinks to rows = 1, columns = 3, key = [79, 218, 245, 87, 91, 127, 36, 90, 156, 168, 83, 1, 154, 160, 208, 55, 108, 197, 14, 23, 6, 139, 126, 67, 62, 233, 60, 230, 187, 141, 90, 165], tag = 3964362837785571883
+</file>
+
+<file path="proptest-regressions/poly/dcrt/sampler/uniform.txt">
+# Seeds for failure cases proptest has generated in the past. It is
+# automatically read and these particular cases re-run before any
+# novel cases are generated.
+#
+# It is recommended to check this file in to source control so that
+# everyone who runs the test benefits from these saved cases.
+cc f68894051708946571aca5cfa6c2dfe90f53a7d06479c77f5a70ddd10924fae8 # shrinks to rows = 6, columns = 6
+cc 6f392d0b54040abec27cd17808d82636d5eb8f98dfdd1676a0b37b1541e65385 # shrinks to rows = 1, columns = 7
+cc e39d147a680b86cfcc30d200900b0d570d3bbef02d12a47442fdd3ffc377013f # shrinks to rows = 2, columns = 7, sigma = 1.2428541015121788
+</file>
+
+<file path="simulator/environment.yml">
+name: base
+channels:
+  - conda-forge
+dependencies:
+  - archspec=0.2.5=pyhd8ed1ab_0
+  - boltons=24.0.0=pyhd8ed1ab_1
+  - brotli-python=1.1.0=py312hde4cb15_2
+  - bzip2=1.0.8=h99b78c6_7
+  - c-ares=1.34.4=h5505292_0
+  - ca-certificates=2024.12.14=hf0a4a13_0
+  - certifi=2024.12.14=pyhd8ed1ab_0
+  - cffi=1.17.1=py312h0fad829_0
+  - charset-normalizer=3.4.1=pyhd8ed1ab_0
+  - colorama=0.4.6=pyhd8ed1ab_1
+  - conda=24.11.3=py312h81bd7bf_0
+  - conda-libmamba-solver=24.9.0=pyhd8ed1ab_0
+  - conda-package-handling=2.4.0=pyh7900ff3_2
+  - conda-package-streaming=0.11.0=pyhd8ed1ab_0
+  - distro=1.9.0=pyhd8ed1ab_1
+  - fmt=11.0.2=h420ef59_0
+  - frozendict=2.4.6=py312h0bf5046_0
+  - h2=4.1.0=pyhd8ed1ab_1
+  - hpack=4.0.0=pyhd8ed1ab_1
+  - hyperframe=6.0.1=pyhd8ed1ab_1
+  - icu=75.1=hfee45f7_0
+  - idna=3.10=pyhd8ed1ab_1
+  - jsonpatch=1.33=pyhd8ed1ab_1
+  - jsonpointer=3.0.0=py312h81bd7bf_1
+  - krb5=1.21.3=h237132a_0
+  - libarchive=3.7.7=h3b16cec_3
+  - libcurl=8.11.1=h73640d1_0
+  - libcxx=19.1.7=ha82da77_0
+  - libedit=3.1.20240808=pl5321hafb1f1b_0
+  - libev=4.33=h93a5062_2
+  - libexpat=2.6.4=h286801f_0
+  - libffi=3.4.2=h3422bc3_5
+  - libiconv=1.17=h0d3ecfb_2
+  - liblzma=5.6.3=h39f12f2_1
+  - libmamba=1.5.12=hdf44a08_0
+  - libmambapy=1.5.12=py312h86ad8a2_0
+  - libnghttp2=1.64.0=h6d7220d_0
+  - libsolv=0.7.30=h6c9b7f8_0
+  - libsqlite=3.48.0=h3f77e49_0
+  - libssh2=1.11.1=h9cc3647_0
+  - libxml2=2.13.5=h178c5d8_1
+  - libzlib=1.3.1=h8359307_2
+  - lz4-c=1.10.0=h286801f_1
+  - lzo=2.10=h93a5062_1001
+  - mamba=1.5.12=py312h14bc7db_0
+  - menuinst=2.2.0=py312h81bd7bf_0
+  - ncurses=6.5=h5e97a16_2
+  - openssl=3.4.0=h81ee809_1
+  - packaging=24.2=pyhd8ed1ab_2
+  - pip=24.3.1=pyh8b19718_2
+  - platformdirs=4.3.6=pyhd8ed1ab_1
+  - pluggy=1.5.0=pyhd8ed1ab_1
+  - pybind11-abi=4=hd8ed1ab_3
+  - pycosat=0.6.6=py312hea69d52_2
+  - pycparser=2.22=pyh29332c3_1
+  - pysocks=1.7.1=pyha55dd90_7
+  - python=3.12.8=hc22306f_1_cpython
+  - python_abi=3.12=5_cp312
+  - readline=8.2=h92ec313_1
+  - reproc=14.2.5.post0=h5505292_0
+  - reproc-cpp=14.2.5.post0=h286801f_0
+  - requests=2.32.3=pyhd8ed1ab_1
+  - ruamel.yaml=0.18.10=py312hea69d52_0
+  - ruamel.yaml.clib=0.2.8=py312h0bf5046_1
+  - setuptools=75.8.0=pyhff2d567_0
+  - tk=8.6.13=h5083fa2_1
+  - tqdm=4.67.1=pyhd8ed1ab_1
+  - truststore=0.10.0=pyhd8ed1ab_0
+  - tzdata=2025a=h78e105d_0
+  - urllib3=2.3.0=pyhd8ed1ab_0
+  - wheel=0.45.1=pyhd8ed1ab_1
+  - yaml-cpp=0.8.0=h13dd4ca_0
+  - zstandard=0.23.0=py312h15fbf35_1
+  - zstd=1.5.6=hb46c0d2_0
+  - pip:
+      - accessible-pygments==0.0.5
+      - alabaster==1.0.0
+      - appnope==0.1.4
+      - asttokens==3.0.0
+      - attrs==25.1.0
+      - babel==2.16.0
+      - beautifulsoup4==4.12.3
+      - black==24.10.0
+      - bleach==6.2.0
+      - click==8.1.8
+      - cloudpickle==3.1.1
+      - comm==0.2.2
+      - dask==2025.1.0
+      - debugpy==1.8.12
+      - decorator==5.1.1
+      - defusedxml==0.7.1
+      - distributed==2025.1.0
+      - docutils==0.21.2
+      - execnet==2.1.1
+      - executing==2.2.0
+      - fastjsonschema==2.21.1
+      - flake8==7.0.0
+      - fsspec==2024.12.0
+      - imagesize==1.4.1
+      - iniconfig==2.0.0
+      - ipykernel==6.29.5
+      - ipython==8.31.0
+      - jedi==0.19.2
+      - jinja2==3.1.5
+      - jsonschema==4.23.0
+      - jsonschema-specifications==2024.10.1
+      - jupyter-client==8.6.3
+      - jupyter-core==5.7.2
+      - jupyterlab-pygments==0.3.0
+      - locket==1.0.0
+      - markupsafe==3.0.2
+      - matplotlib-inline==0.1.7
+      - mccabe==0.7.0
+      - mistune==3.1.0
+      - msgpack==1.1.0
+      - mypy-extensions==1.0.0
+      - nbclient==0.10.2
+      - nbconvert==7.16.5
+      - nbformat==5.10.4
+      - nbmake==1.5.5
+      - nest-asyncio==1.6.0
+      - pandocfilters==1.5.1
+      - parso==0.8.4
+      - partd==1.4.2
+      - pathspec==0.12.1
+      - pexpect==4.9.0
+      - prompt-toolkit==3.0.50
+      - psutil==6.1.1
+      - ptyprocess==0.7.0
+      - pure-eval==0.2.3
+      - pycodestyle==2.11.1
+      - pydata-sphinx-theme==0.16.1
+      - pyflakes==3.2.0
+      - pygments==2.19.1
+      - pyproject-flake8==7.0.0
+      - pytest==8.3.4
+      - pytest-xdist==3.6.1
+      - python-dateutil==2.9.0.post0
+      - pyyaml==6.0.2
+      - pyzmq==26.2.0
+      - referencing==0.36.2
+      - rpds-py==0.22.3
+      - six==1.17.0
+      - snowballstemmer==2.2.0
+      - sortedcontainers==2.4.0
+      - soupsieve==2.6
+      - sphinx==8.1.3
+      - sphinx-book-theme==1.1.3
+      - sphinxcontrib-applehelp==2.0.0
+      - sphinxcontrib-devhelp==2.0.0
+      - sphinxcontrib-htmlhelp==2.1.0
+      - sphinxcontrib-jsmath==1.0.1
+      - sphinxcontrib-jupyter==0.5.10
+      - sphinxcontrib-qthelp==2.0.0
+      - sphinxcontrib-serializinghtml==2.0.0
+      - stack-data==0.6.3
+      - tblib==3.0.0
+      - tinycss2==1.4.0
+      - toolz==1.0.0
+      - tornado==6.4.2
+      - traitlets==5.14.3
+      - typing-extensions==4.12.2
+      - wcwidth==0.2.13
+      - webencodings==0.5.1
+      - zict==3.0.0
+prefix: /Users/suegamisora/miniforge3
+</file>
+
+<file path="simulator/main.py">
+#!/usr/bin/env sage -python
+# import sys
+# from sage.all import *
+from estimator.estimator import *
+from estimator.estimator.lwe_parameters import *
+from estimator.estimator.nd import *
+import math
+import datetime
+import os
+from decimal import Decimal, getcontext
+from norms import CircuitNorms
+import os
+import subprocess
+import json
+
+getcontext().prec = 300
+script_dir = os.path.dirname(os.path.abspath(__file__))
+
+
+def log_params_to_file(
+    input_size: int,
+    input_width: int,
+    add_num: int,
+    mul_num: int,
+    t_num: int,
+    max_crt_depth: int,
+    secpar: int,
+    n: int,
+    d: int,
+    base_bits: int,
+    crt_bits: int,
+    crt_depth: int,
+    stddev_e_p: int,
+    stddev_e_hardcode: int,
+    p: int,
+    estimated_secpar: float,
+    size: int,
+):
+    """
+    Log parameters to params.log file
+    """
+    # Calculate log_q, q, and log_p
+    log_q = crt_bits * crt_depth
+    q = 2 ** (log_q + 1) - 1
+    log_p = math.log2(p)
+
+    # Get current date and time
+    current_date = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+    # Format m_polys as a string
+    # m_polys_str = str(m_polys).replace(" ", "")
+
+    # Create log entry with key information
+    log_entry = (
+        f"{current_date}, "
+        f"input_size={input_size}, "
+        f"input_width={input_width}, "
+        f"add_num={add_num}, "
+        f"mul_num={mul_num}, "
+        f"t_num={t_num}, "
+        f"max_crt_depth={max_crt_depth}, "
+        f"secpar={secpar}, "
+        f"n={n}, "
+        f"d={d}, "
+        f"crt_bits={crt_bits}, "
+        f"crt_depth={crt_depth}, "
+        f"base_bits={base_bits}, "
+        f"q={q}, "
+        f"log2(q)={log_q}, "
+        f"switched_modulus={p}, "
+        f"log2(switched_modulus)={log_p}, "
+        f"p_sigma={stddev_e_p}, "
+        f"hardcoded_key_sigma={stddev_e_hardcode}, "
+        f"estimated_secpar={estimated_secpar}, "
+        f"size={size} [GB]\n"
+    )
+
+    # Append to params.log file
+    with open("params.log", "a") as f:
+        f.write(log_entry)
+
+    print(f"Parameters logged to params.log")
+
+
+def find_params(
+    target_secpar: int,
+    log2_n: int,
+    max_d: int,
+    min_base_bits: int,
+    max_base_bits: int,
+    crt_bits: int,
+    max_crt_depth: int,
+    input_size: int,
+    input_width: int,
+    bench_type: str,
+    add_num: int,
+    mul_num: int,
+    t_num: int,
+):
+    for d in range(1, max_d + 1):
+        print(f"Trying d: {d}")
+        found_params = []
+        for base_bits in range(min_base_bits, max_base_bits + 1):
+            print(f"Trying base_bits: {base_bits}")
+            config = {
+                "d": d,
+                "log_ring_dim": log2_n,
+                "max_crt_depth": max_crt_depth,
+                "crt_bits": crt_bits,
+                "base_bits": base_bits,
+            }
+            config_file = f"sim_norm_config_{input_size}_{input_width}_{bench_type}_{add_num}_{mul_num}_{t_num}_{log2_n}_{max_crt_depth}_{crt_bits}_{base_bits}.json"
+            with open(
+                os.path.join(
+                    script_dir,
+                    config_file,
+                ),
+                "w",
+            ) as f:
+                f.write(json.dumps(config, indent=4))
+            norms_path = os.path.join(
+                script_dir,
+                f"norms_{input_size}_{input_width}_{bench_type}_{add_num}_{mul_num}_{t_num}_{log2_n}_{max_crt_depth}_{crt_bits}_{base_bits}.json",
+            )
+            cmd = [
+                "dio",
+                "sim-bench-norm",
+                "-c",
+                config_file,
+                "-o",
+                norms_path,
+                "--bench-type",
+                bench_type,
+            ]
+            if bench_type == "add_mul":
+                cmd += ["--add-num", str(add_num), "--mul-num", str(mul_num)]
+            elif bench_type == "plt":
+                cmd += ["--t-num", str(t_num)]
+            else:
+                raise ValueError(f"Unsupported bench_type: {bench_type}")
+            subprocess.run(cmd, check=True)
+            os.remove(config_file)
+
+            n = 2**log2_n
+            try:
+                (
+                    crt_depth,
+                    stddev_e_p,
+                    stddev_e_hardcode,
+                    p,
+                    estimated_secpar,
+                    size,
+                ) = find_params_fixed_n_d_base(
+                    target_secpar,
+                    n,
+                    d,
+                    base_bits,
+                    crt_bits,
+                    max_crt_depth,
+                    input_size,
+                    input_width,
+                    norms_path,
+                )
+                os.remove(norms_path)
+                found_params.append(
+                    (
+                        d,
+                        base_bits,
+                        crt_depth,
+                        stddev_e_p,
+                        stddev_e_hardcode,
+                        p,
+                        estimated_secpar,
+                        size,
+                    )
+                )
+            except ValueError as e:
+                print(f"ValueError: {e}")
+                os.remove(norms_path)
+                continue
+        if len(found_params) > 0:
+            return min(found_params, key=lambda x: x[7])
+    raise ValueError("Cannot find parameters")
+
+
+def find_params_fixed_n_d_base(
+    target_secpar: int,
+    n: int,
+    d: int,
+    base_bits: int,
+    crt_bits: int,
+    max_crt_depth: int,
+    input_size: int,
+    input_width: int,
+    norms_path: str,
+):
+    # crt_bits * depth >= target_secpar+2 => depth >= (target_secpar+2) / crt_bits
+    min_crt_depth = math.ceil((target_secpar + 2) / crt_bits)
+    max_log_base_q = math.ceil(crt_bits / base_bits) * max_crt_depth
+    print(f"max_log_base_q: {max_log_base_q}")
+    circuit_norms = CircuitNorms.load_from_file(norms_path, max_log_base_q)
+    packed_input_size = math.ceil(input_size / n) + 1
+    found_params = []
+    iters = 0
+    while min_crt_depth + 1 < max_crt_depth and iters < 100:
+        iters += 1
+        crt_depth = math.floor((min_crt_depth + max_crt_depth) // 2)
+        q = 2 ** (crt_bits * crt_depth + 1) - 1
+        print(f"min_crt_depth: {min_crt_depth}")
+        print(f"max_crt_depth: {max_crt_depth}")
+        print(f"crt_depth: {crt_depth}")
+        print(f"q: {q}")
+
+        min_alpha_ks = []
+        for i in range(2):
+            found_alpha_ks = []
+            dist = Binary
+            min_alpha_k = -crt_bits * crt_depth + 2
+            max_alpha_k = -1
+            if i == 0:
+                # p sigma
+                total_n = n * (1 + packed_input_size) * (d + 1)
+            else:
+                # hardcoded key sigma
+                total_n = n
+                # dist = UniformMod(q)
+            while min_alpha_k + 1 < max_alpha_k:
+                alpha_k = (min_alpha_k + max_alpha_k) / 2
+                print(f"min_alpha_k: {min_alpha_k}")
+                print(f"max_alpha_k: {max_alpha_k}")
+                print(f"alpha_k: {alpha_k}")
+                stddev_e = Decimal(2 ** Decimal(crt_bits * crt_depth + alpha_k))
+                estimated_secpar = estimate_secpar(total_n, q, dist, stddev_e)
+                print("target_secpar:", target_secpar)
+                print("estimated_secpar:", estimated_secpar)
+                if target_secpar > estimated_secpar:
+                    print(
+                        f"target_secpar {target_secpar} > estimated_secpar {estimated_secpar}"
+                    )
+                    min_alpha_k = alpha_k
+                else:
+                    found_alpha_ks.append(alpha_k)
+                    print(f"found alpha_k: {alpha_k}")
+                    max_alpha_k = alpha_k
+                # raise ValueError(f"the {i}-th alpha is not found after binary search")
+            if len(found_alpha_ks) == 0:
+                continue
+            min_alpha_ks.append(min(found_alpha_ks))
+        if len(min_alpha_ks) < 2:
+            print("not enough alpha_ks")
+            max_crt_depth = crt_depth
+            continue
+        alpha_p_k = Decimal(min_alpha_ks[0])
+        alpha_hardcode_k = Decimal(min_alpha_ks[1])
+        print(f"found alpha_p_k: {alpha_p_k}")
+        print(f"found alpha_hardcode_k: {alpha_hardcode_k}")
+        alpha_p = Decimal(2**alpha_p_k)
+        alpha_hardcode = Decimal(2**alpha_hardcode_k)
+        # print(f"found alpha: {alpha}")
+        print(f"found alpha_p: {alpha_p}")
+        print(f"found alpha_hardcode: {alpha_hardcode}")
+
+        # if q_k + alpha_encoding_k < 1:
+        #     print(f"q_k + alpha_encoding < 1")
+        #     min_q_k = q_k
+        #     continue
+        # elif q_k + alpha_hardcode_k < 1:
+        #     print(f"q_k + alpha_hardcode < 1")
+        #     min_q_k = q_k
+        #     continue
+        # elif q_k + alpha_p_k < 1:
+        #     print(f"q_k + alpha_p < 1")
+        #     min_q_k = q_k
+        #     continue
+        stddev_e_p = alpha_p * Decimal(q)
+        stddev_e_hardcode = alpha_hardcode * Decimal(q)
+        estimated_secpar_p = estimate_secpar(
+            (packed_input_size + 1) * (d + 1) * n, q, Binary, stddev_e_p
+        )
+        estimated_secpar_hardcode = estimate_secpar(n, q, Binary, stddev_e_hardcode)
+        min_estimated_secpar = min(
+            estimated_secpar_p,
+            estimated_secpar_hardcode,
+        )
+        print("target_secpar:", target_secpar)
+        print("estimated_secpar:", min_estimated_secpar)
+        if target_secpar > min_estimated_secpar:
+            print(
+                f"target_secpar {target_secpar} > estimated_secpar {min_estimated_secpar}"
+            )
+            max_crt_depth = crt_depth
+            continue
+        try:
+            p = find_p(
+                target_secpar,
+                n,
+                crt_bits,
+                crt_depth,
+                d,
+                base_bits,
+                stddev_e_p,
+                stddev_e_hardcode,
+                input_size,
+                input_width,
+                circuit_norms,
+            )
+            print(f"found p: {p}")
+            print(f"crt_depth: {crt_depth}")
+            print(f"d: {d}")
+            print(f"base_bits: {base_bits}")
+            print(f"stddev_e_p: {stddev_e_p}")
+            print(f"stddev_e_hardcode: {stddev_e_hardcode}")
+            max_crt_depth = crt_depth
+            found_params.append(
+                (
+                    crt_depth,
+                    stddev_e_p,
+                    stddev_e_hardcode,
+                    p,
+                    min_estimated_secpar,
+                )
+            )
+        except ValueError as e:
+            print(f"ValueError: {e}")
+            min_crt_depth = crt_depth
+    if found_params == []:
+        raise ValueError("p is not found after binary search")
+    # minimum q in found_params
+    (
+        crt_depth,
+        stddev_e_p,
+        stddev_e_hardcode,
+        p,
+        estimated_secpar,
+    ) = min(found_params, key=lambda x: x[0])
+    size = compute_obf_size(
+        n,
+        crt_bits,
+        crt_depth,
+        d,
+        base_bits,
+        input_size,
+        input_width,
+        1,  # [TODO] output_size
+    )
+    return (
+        crt_depth,
+        stddev_e_p,
+        stddev_e_hardcode,
+        p,
+        estimated_secpar,
+        size,
+    )
+
+
+def find_p(
+    secpar: int,
+    n: int,
+    crt_bits: int,
+    crt_depth: int,
+    d: int,
+    base_bits: int,
+    stddev_e_p: int,
+    stddev_e_hardcode: int,
+    input_size: int,
+    input_width: int,
+    circuit_norms: CircuitNorms,
+):
+    log_q = crt_bits * crt_depth
+    log_base_q = math.ceil(crt_bits / base_bits) * crt_depth
+    base = 2**base_bits
+    packed_input_size = Decimal(math.ceil(input_size / n)) + 1
+    norm_b = compute_norm_b(n, log_base_q, d, base, packed_input_size)
+    (final_err, bound_s) = bound_final_error(
+        secpar,
+        n,
+        log_base_q,
+        d,
+        base,
+        stddev_e_p,
+        stddev_e_hardcode,
+        norm_b,
+        input_size,
+        input_width,
+        circuit_norms,
+    )
+
+    # Convert final_err to Decimal for high precision
+    # final_err_decimal = Decimal(str(final_err))
+    # Calculate log2 using Decimal
+    # Handle infinity or very large numbers
+    if math.isinf(final_err):
+        raise ValueError(f"Error: final_err is infinity.")
+    elif final_err > 0:
+        log_final_err = math.ceil(math.log2(float(final_err)))
+    else:
+        raise ValueError(f"Cannot calculate log2 of non-positive value: {final_err}")
+
+    if log_q - 2 < log_final_err + secpar:
+        raise ValueError(
+            f"log_q - 2 >= log_final_err + secpar should hold. log2(final_error): {log_final_err}, log2(q): {log_q})"
+        )
+    print(f"final_err: {final_err}")
+    print(f"log_final_err: {log_final_err}")
+    # Use Decimal for high precision arithmetic
+    # Convert to Decimal for high precision calculations
+    prf_bound = 2 ** (log_q - 2) - (2 ** (log_final_err + 1) - 1)
+    p = math.floor(prf_bound / bound_s / n / (1 + packed_input_size) / (d + 1))
+    if p < 0:
+        raise ValueError(f"p should be non-negative: {p}")
+
+    # Calculate log2(p) using Decimal
+    # if p_decimal > 0:
+    #     log_p = math.ceil(float(p_decimal.ln() / Decimal("0.693147180559945")))  # ln(2)
+    # else:
+    #     raise ValueError(f"Cannot calculate log2 of non-positive value: {p}")
+
+    # if log_p - log_final_err < secpar:
+    #     raise ValueError(
+    #         f"p - error should be larger than 2^secpar (given p: {p}, secpar: {secpar})"
+    #     )
+
+    return p
+
+
+def compute_norm_b(n: int, log_base_q: int, d: int, base: int, packed_input_size: int):
+    c_0 = 1.8
+    c_1 = 4.7
+    sigma = 4.578
+    return (
+        6.0
+        * c_0
+        * sigma
+        * ((base + 1) * sigma)
+        * (
+            sqrt_ceil((1 + packed_input_size) * (d + 1) * n * log_base_q)
+            + sqrt_ceil(2 * n)
+            + c_1
+        )
+    )
+
+
+def estimate_secpar(n: int, q: int, s_dist: NoiseDistribution, stddev: int):
+    params = LWEParameters(n, q, s_dist, DiscreteGaussian(stddev))
+    estim = LWE.estimate.rough(params)
+    # print(estim)
+    vals = estim.values()
+    if len(vals) == 0:
+        return 0
+    min_rop_log = math.log2(min(val["rop"] for val in vals))
+    print(f"min_rop_log: {min_rop_log}")
+    if min_rop_log == float("inf"):
+        return 100000
+    min_secpar = math.ceil(min_rop_log)
+    print(f"min_secpar: {min_secpar}")
+    # print(min_secpar)
+    return min_secpar
+
+
+def bound_final_error(
+    secpar: int,
+    n: int,
+    log_base_q: int,
+    d: int,
+    base: int,
+    stddev_e_p: int,
+    stddev_e_hardcode: int,
+    norm_b: int,
+    input_size: int,
+    input_width: int,
+    circuit_norms: CircuitNorms,
+):
+    # Convert all inputs to Decimal for high precision
+    # secpar_d = Decimal(secpar)
+    n = Decimal(n)
+    log_base_q = Decimal(log_base_q)
+    d = Decimal(d)
+    stddev_e_p = Decimal(stddev_e_p)
+    stddev_e_hardcode = Decimal(stddev_e_hardcode)
+    stddev_e_p = Decimal(stddev_e_p)
+    norm_b = Decimal(norm_b)
+    print(f"norm_b: {norm_b}")
+    # + 1 is for the secret key t
+    packed_input_size = Decimal(math.ceil(input_size / n)) + 1
+    m = (Decimal(1) + packed_input_size) * (d + Decimal(1)) * log_base_q
+    # [TODO] Support outputs larger than `log_t_q`
+    h_norms = [Decimal(x) for x in circuit_norms.compute_norms(m, n, base)]
+    print(f"h_norms: {h_norms}")
+    h_norm_sum = sum(h_norms)
+    # Calculate intermediate values with Decimal
+    m_b = (
+        (Decimal(1) + packed_input_size) * (d + Decimal(1)) * (log_base_q + Decimal(2))
+    )
+    sqrt_secpar = Decimal(sqrt_ceil(secpar))
+    base = Decimal(base)
+
+    # Use Decimal for all calculations to maintain precision
+    bound_p = stddev_e_p * sqrt_secpar
+    print(f"stddev_e_p: {stddev_e_p}")
+    print(f"sqrt_secpar: {sqrt_secpar}")
+    # print(f"stddev_e_encoding : {stddev_e_encoding}")
+    # bound_c = stddev_e_encoding * sqrt_secpar
+    # print(f"init bound_c: {bound_c}")
+    # if bound_c < 0:
+    #     raise ValueError(f"bound_c should be non-negative: {bound_c}")
+    bound_s = Decimal(1.0)
+
+    input_depth = math.ceil(input_size / input_width)
+
+    for _ in range(input_depth):
+        bound_p = m_b * n * bound_p * norm_b + bound_s * stddev_e_p * sqrt_secpar
+        bound_s = bound_s * n * d
+
+    # Evaluate each polynomial in m_polys at the value of m using Decimal
+    # evaluated_polys_d = []
+    # for poly in m_polys:
+    #     # Evaluate polynomial: sum(coeff * m^i for i, coeff in enumerate(poly))
+    #     result_d = Decimal(0)
+    #     for i, coeff in enumerate(poly):
+    #         result_d += Decimal(coeff) * (m_d ** Decimal(i))
+    #     evaluated_polys_d.append(result_d)
+
+    # # Find max value using Decimal
+    # if evaluated_polys_d:
+    #     max_evaluated_poly_d = max(evaluated_polys_d)
+    # else:
+    #     max_evaluated_poly_d = Decimal(1)  # Default if no polynomials
+    bound_att = m_b * n * bound_p * norm_b
+    bound_v = bound_att
+    bound_att_final = (packed_input_size * m) * n * bound_att * h_norm_sum
+    bound_rounding = bound_s
+    print(f"bound_rounding: {bound_rounding}")
+    print(f"log2(bound_rounding): {math.log2(bound_rounding)}")
+    bound_final = (
+        bound_att_final + bound_v + stddev_e_hardcode * sqrt_secpar + bound_rounding
+    )
+
+    # Return the final result as a Decimal
+    return (
+        bound_final,
+        bound_s,
+    )
+
+
+def compute_obf_size(
+    n: int,
+    crt_bits: int,
+    crt_depth: int,
+    d: int,
+    base_bits: int,
+    input_size: int,
+    input_width: int,
+    output_size: int,
+):
+    size = 256
+    packed_input_size = math.ceil(input_size / n)
+    log_q = crt_bits * crt_depth
+    log_base_q = math.ceil(crt_bits / base_bits) * crt_depth
+    print("base_bits", base_bits)
+    print("crt_bits", crt_bits)
+    print("crt_depth", crt_depth)
+    print("log_q", log_q)
+    print("log_base_q", log_base_q)
+    m = (d + 1) * log_base_q
+    print("m", m)
+    packed_input_size = math.ceil(input_size / n) + 1
+    m_b = (1 + packed_input_size) * (d + 1) * (log_base_q + 2)
+    print("m_b", m_b)
+    # encoding_init_size = log_q * n * packed_input_size * m
+    # print("encoding_init_size GB", encoding_init_size / 8 / 10**9)
+    # size += encoding_init_size
+    p_init_size = log_q * n * m_b
+    print("p_init_size GB", p_init_size / 8 / 10**9)
+    size += p_init_size
+    base = 2**base_bits
+    b_norm = Decimal(compute_norm_b(n, log_base_q, d, base, packed_input_size))
+    bound_b_log = math.ceil(math.log2(b_norm))
+    input_depth = math.ceil(input_size / input_width)
+    k_preimages_size = (2**input_width) * input_depth * bound_b_log * n * m_b * m_b
+    print("k_preimages_size GB", k_preimages_size / 8 / 10**9)
+    size += k_preimages_size
+    att_preimage_size = (
+        m_b * ((packed_input_size + 1) * (d + 1) * log_base_q) * n * bound_b_log
+    )
+    print("att_preimage_size GB", att_preimage_size / 8 / 10**9)
+    size += att_preimage_size
+    packed_output_size = math.ceil(output_size / n)
+    final_preimage_size = m_b * packed_output_size * n * bound_b_log
+    print("final_preimage_size GB", final_preimage_size / 8 / 10**9)
+    size += final_preimage_size
+    return size / 8 / 10**9
+
+
+def sqrt_ceil(x):
+    return math.ceil(math.sqrt(x))
+
+
+if __name__ == "__main__":
+    secpar = 100
+    log2_n = 13
+    max_d = 3
+    min_base_bits = 16
+    max_base_bits = 20
+    crt_bits = 51
+    max_crt_depth = 20
+    input_size = 1
+    input_width = 1
+    bench_type = "plt"
+    add_num = 0
+    mul_num = 0
+    t_num = 8
+    if input_size % input_width != 0:
+        raise ValueError("input_size should be divisible by input_width")
+    (
+        d,
+        base_bits,
+        crt_depth,
+        stddev_e_p,
+        stddev_e_hardcode,
+        p,
+        estimated_secpar,
+        size,
+    ) = find_params(
+        secpar,
+        log2_n,
+        max_d,
+        min_base_bits,
+        max_base_bits,
+        crt_bits,
+        max_crt_depth,
+        input_size,
+        input_width,
+        bench_type,
+        add_num,
+        mul_num,
+        t_num,
+    )
+    print(f"input_size: {input_size}")
+    print(f"input_width: {input_width}")
+    print(f"crt_bits: {crt_bits}")
+    print(f"crt_depth: {crt_depth}")
+    print(f"d: {d}")
+    print(f"base_bits: {base_bits}")
+    print(f"q: {2**(crt_bits * crt_depth)}, log_2 q: {crt_bits * crt_depth}")
+    print(f"stddev_e_p: {stddev_e_p}")
+    print(f"stddev_e_hardcode: {stddev_e_hardcode}")
+    print(f"p: {p}, log_2 p: {math.log2(p)}")
+    print(f"estimated_secpar: {estimated_secpar}")
+    print(f"size: {size} [GB]")
+    # Log parameters to params.log file
+    log_params_to_file(
+        input_size,
+        input_width,
+        add_num,
+        mul_num,
+        t_num,
+        max_crt_depth,
+        secpar,
+        2**log2_n,
+        d,
+        base_bits,
+        crt_bits,
+        crt_depth,
+        stddev_e_p,
+        stddev_e_hardcode,
+        p,
+        estimated_secpar,
+        size,
+    )
+</file>
+
+<file path="simulator/norms.py">
+import json
+from typing import List
+import os
+
+
+class CircuitNorms:
+    """
+    A class to read and parse circuit norm data from JSON files.
+
+    This class reads JSON files in the format of final_bits_norm.json, which contains
+    a list of lists of string values representing integers, and converts them to
+    a list of lists of integers.
+    """
+
+    def __init__(self, h_norms: List[List[int]], log_base_q: int):
+        """
+        Initialize a CircuitNorms object.
+
+        Args:
+            h_norms: List of lists of integers representing the norms.
+        """
+        self.h_norms = h_norms
+        self.log_base_q = log_base_q
+
+    @classmethod
+    def from_json(cls, json_data: dict, log_base_q: int) -> "CircuitNorms":
+        """
+        Create a CircuitNorms object from JSON data.
+
+        Args:
+            json_data: A dictionary containing the JSON data with an 'h_norms' key
+                      that maps to a list of lists of string values.
+
+        Returns:
+            A CircuitNorms object with the parsed data.
+        """
+        if "h_norms" not in json_data:
+            raise ValueError("JSON data must contain an 'h_norms' key")
+
+        # Convert string values to integers
+        h_norms = []
+        for norm_list in json_data["h_norms"]:
+            h_norms.append([int(value) for value in norm_list])
+
+        return cls(h_norms, log_base_q)
+
+    @classmethod
+    def load_from_file(cls, file_path: str, log_base_q: int) -> "CircuitNorms":
+        """
+        Load a CircuitNorms object from a JSON file.
+
+        Args:
+            file_path: Path to the JSON file containing the norm data.
+
+        Returns:
+            A CircuitNorms object with the parsed data.
+        """
+        if not os.path.exists(file_path):
+            raise FileNotFoundError(f"File not found: {file_path}")
+
+        with open(file_path, "r") as f:
+            json_data = json.load(f)
+
+        return cls.from_json(json_data, log_base_q)
+
+    def get_h_norms(self) -> List[List[int]]:
+        """
+        Get the h_norms data.
+
+        Returns:
+            A list of lists of integers representing the norms.
+        """
+        return self.h_norms
+
+    def compute_norms(self, m: int, n: int, base: int) -> List[int]:
+        bit_norms = [0 for _ in range(len(self.h_norms))]
+        max_deg = max([len(norm) for norm in self.h_norms])
+        power_ms = [m**i for i in range(max_deg)]
+        for coeffs in self.h_norms:
+            for i, coeff in enumerate(coeffs):
+                bit_norms[i] += coeff * power_ms[i]
+        assert len(bit_norms) % self.log_base_q == 0
+        norms = []
+        for i in range(0, len(bit_norms), self.log_base_q):
+            sum = 0
+            for j in range(self.log_base_q):
+                sum += bit_norms[self.log_base_q * i + j] * (base - 1) * n * m
+            norms.append(sum)
+        return norms
+
+    def __len__(self) -> int:
+        """
+        Get the number of norm lists.
+
+        Returns:
+            The number of norm lists.
+        """
+        return len(self.h_norms)
+
+    def __getitem__(self, index: int) -> List[int]:
+        """
+        Get a specific norm list by index.
+
+        Args:
+            index: The index of the norm list to get.
+
+        Returns:
+            A list of integers representing the norms at the specified index.
+        """
+        return self.h_norms[index]
+</file>
+
+<file path="simulator/requirements.txt">
+-r estimator/requirements.txt
+</file>
+
+<file path="src/io/bgm.rs">
+use rodio::{OutputStreamBuilder, Sink, Source};
+use std::{fs::File, path::Path};
+
+pub struct Player {
+    sink: Sink,
+}
+
+impl Default for Player {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl Player {
+    pub fn new() -> Self {
+        let stream_handle = OutputStreamBuilder::open_default_stream().unwrap();
+        let sink = rodio::Sink::connect_new(stream_handle.mixer());
+        Player { sink }
+    }
+
+    pub fn play_music<P: AsRef<Path>>(&self, file: P) {
+        self.stop_music();
+        let file = File::open(file).unwrap();
+        let source = rodio::Decoder::try_from(file).unwrap().repeat_infinite();
+        self.sink.append(source);
+        self.sink.play();
+    }
+
+    pub fn stop_music(&self) {
+        self.sink.stop();
+        self.sink.clear();
+    }
+}
+</file>
+
+<file path="src/io/composite_circuit.rs">
+use mxx::circuit::{Evaluable, PolyCircuit};
+
+/// Build a circuit that is a composition of two sub-circuits:
+/// 1. A public circuit that it is assumed to return one or more ciphertexts where each ciphertext
+///    is base decomposed -> BaseDecompose(ct_0), BaseDecompose(ct_1), ... where BaseDecompose(ct_k)
+///    = [a_base_0, b_base_0, a_base_1, b_base_1, ...]
+/// 2. An FHE decryption circuit that takes each ciphertext and the FHE secret key -t_bar as inputs
+///    and returns the base decomposed plaintext for each cipheretxt
+pub fn build_composite_circuit_from_public_and_fhe_dec<E: Evaluable>(
+    public_circuit: PolyCircuit<E::P>,
+    log_base_q: usize,
+) -> PolyCircuit<E::P> {
+    let num_pub_circuit_input = public_circuit.num_input();
+    let num_pub_circuit_output = public_circuit.num_output();
+    debug_assert_eq!(num_pub_circuit_output % (2 * log_base_q), 0);
+
+    let num_output = public_circuit.num_output() / 2;
+    let num_input = num_pub_circuit_input + 1;
+    let mut circuit = PolyCircuit::new();
+    let inputs = circuit.input(num_input);
+    let pub_circuit_inputs = &inputs[0..num_pub_circuit_input];
+    let minus_t_bar = &inputs[num_pub_circuit_input];
+    let circuit_id = circuit.register_sub_circuit(public_circuit);
+    let pub_circuit_outputs = circuit.call_sub_circuit(circuit_id, pub_circuit_inputs);
+    let mut outputs = Vec::with_capacity(num_output);
+
+    // Process each pair (a_base, b_base) from the public circuit outputs
+    // result = a_base * -t_bar + b_base
+    for i in 0..num_output {
+        let a_digit = pub_circuit_outputs[i * 2];
+        let b_digit = pub_circuit_outputs[i * 2 + 1];
+        let mul = circuit.mul_gate(a_digit, *minus_t_bar);
+        let result = circuit.add_gate(b_digit, mul);
+        outputs.push(result);
+    }
+
+    circuit.output(outputs);
+    circuit
+}
+
+#[cfg(test)]
+mod tests {
+    use mxx::{
+        bgg::digits_to_int::DigitsToInt,
+        lookup::poly::PolyPltEvaluator,
+        poly::{
+            dcrt::{params::DCRTPolyParams, poly::DCRTPoly},
+            Poly, PolyParams,
+        },
+        rlwe_enc::rlwe_encrypt,
+        sampler::{uniform::DCRTPolyUniformSampler, DistType, PolyUniformSampler},
+    };
+
+    use super::*;
+
+    #[test]
+    fn test_build_composite_circuit_from_public_and_fhe_dec() {
+        // 1. Set up parameters
+        let params = DCRTPolyParams::default();
+        let log_base_q = params.modulus_digits();
+        let sampler_uniform = DCRTPolyUniformSampler::new();
+        let sigma = 3.0;
+
+        // 2. Create a simple public circuit that takes 2*log_q inputs and outputs them directly
+        let mut public_circuit = PolyCircuit::new();
+        {
+            let inputs = public_circuit.input(2 * log_base_q);
+            public_circuit.output(inputs[0..2 * log_base_q].to_vec());
+        }
+
+        // 3. Generate a random hardcoded key
+        let hardcoded_key = sampler_uniform.sample_uniform(&params, 1, 1, DistType::BitDist);
+
+        // 4. Generate RLWE ciphertext for the hardcoded key
+        let a_rlwe_bar = sampler_uniform.sample_uniform(&params, 1, 1, DistType::BitDist);
+        let t_bar_matrix = sampler_uniform.sample_uniform(&params, 1, 1, DistType::BitDist);
+
+        let b = rlwe_encrypt(
+            &params,
+            &sampler_uniform,
+            &t_bar_matrix,
+            &a_rlwe_bar,
+            &hardcoded_key,
+            sigma,
+        );
+
+        // 5. Build a composite circuit from public circuit and FHE decryption
+        let circuit =
+            build_composite_circuit_from_public_and_fhe_dec::<DCRTPoly>(public_circuit, log_base_q);
+
+        // 6. Evaluate the circuit with inputs a_bit_0, b_bit_0, a_bit_1, b_bit_1, ..., -t_bar
+        let a_decomposed = a_rlwe_bar.entry(0, 0).decompose_base(&params);
+        let b_decomposed = b.entry(0, 0).decompose_base(&params);
+        let minus_t_bar = -t_bar_matrix.entry(0, 0);
+        let mut inputs = Vec::with_capacity(2 * log_base_q + 1);
+        for i in 0..log_base_q {
+            inputs.push(a_decomposed[i].clone());
+            inputs.push(b_decomposed[i].clone());
+        }
+        inputs.push(minus_t_bar.clone());
+
+        assert_eq!(inputs.len(), 2 * log_base_q + 1);
+        let one = DCRTPoly::const_one(&params);
+        let outputs = circuit.eval(&params, &one, &inputs, None::<PolyPltEvaluator>);
+        assert_eq!(outputs.len(), log_base_q);
+
+        // 7. Verify the correctness of the output
+        for i in 0..log_base_q {
+            let a_digit = a_decomposed[i].clone();
+            let b_digit = b_decomposed[i].clone();
+            let expected_output = a_digit * minus_t_bar.clone() + b_digit;
+            assert_eq!(outputs[i], expected_output);
+        }
+
+        // 8. Recompose the output
+        let output_ints = DCRTPoly::digits_to_int(&outputs, &params);
+        let output_recovered_bits = output_ints.extract_bits_with_threshold(&params);
+        assert_eq!(output_recovered_bits, hardcoded_key.entry(0, 0).to_bool_vec());
+    }
+}
+</file>
+
+<file path="src/io/eval.rs">
+#[cfg(feature = "bgm")]
+use super::bgm::Player;
+use super::{params::ObfuscationParams, utils::build_poly_vec};
+use crate::io::utils::{build_final_digits_circuit, sample_public_key_by_id, PublicSampledData};
+use itertools::Itertools;
+#[cfg(feature = "debug")]
+use mxx::parallel_iter;
+use mxx::{
+    bgg::{digits_to_int::DigitsToInt, encoding::BggEncoding, sampler::BGGPublicKeySampler},
+    lookup::lwe_eval::LweBggEncodingPltEvaluator,
+    matrix::PolyMatrix,
+    poly::{Poly, PolyParams},
+    sampler::{PolyHashSampler, PolyTrapdoorSampler},
+    utils::{log_mem, timed_read},
+};
+use rayon::{iter::ParallelIterator, slice::ParallelSlice};
+use std::{path::Path, sync::Arc, time::Duration};
+
+pub fn evaluate<M, SH, ST, P>(
+    obf_params: ObfuscationParams<M>,
+    inputs: &[bool],
+    dir_path: P,
+) -> Vec<bool>
+where
+    M: PolyMatrix,
+    SH: PolyHashSampler<[u8; 32], M = M> + Send + Sync,
+    ST: PolyTrapdoorSampler<M = M>,
+    P: AsRef<Path>,
+{
+    #[cfg(feature = "bgm")]
+    let player = Player::new();
+
+    #[cfg(feature = "bgm")]
+    {
+        player.play_music("bgm/eval_bgm1.mp3");
+    }
+    let d = obf_params.d;
+    let params = Arc::new(obf_params.params.clone());
+    let log_base_q = params.modulus_digits();
+    let dir_path = dir_path.as_ref().to_path_buf();
+    assert_eq!(inputs.len(), obf_params.input_size);
+
+    let mut total_load = Duration::ZERO;
+
+    let hash_key = {
+        let mut path = dir_path.clone();
+        path.push("hash_key");
+        let bytes = timed_read(
+            "hash_key",
+            || std::fs::read(&path).expect("Failed to read hash key file"),
+            &mut total_load,
+        );
+        let mut hash_key = [0u8; 32];
+        hash_key.copy_from_slice(&bytes);
+        hash_key
+    };
+    // explictly sample d+1 public keys
+    let bgg_pubkey_sampler = BGGPublicKeySampler::<_, SH>::new(hash_key, d + 1);
+    let public_data = PublicSampledData::<SH>::sample(&obf_params, hash_key);
+    log_mem("Sampled public data");
+    let packed_input_size = public_data.packed_input_size;
+    let m_b = (1 + packed_input_size) * (d + 1) * (2 + log_base_q);
+    let packed_output_size = public_data.packed_output_size;
+    let mut p_cur = timed_read(
+        "p_cur",
+        || M::read_from_files(&obf_params.params, 1, m_b, &dir_path, "p_init"),
+        &mut total_load,
+    );
+    log_mem(format!("p_init ({},{}) loaded", p_cur.row_size(), p_cur.col_size()));
+
+    let reveal_plaintexts = {
+        let mut reveals = vec![true; packed_input_size + 1];
+        // Only reveal FHE secret key in debug mode.
+        reveals[packed_input_size] = cfg!(feature = "debug");
+        reveals
+    };
+    let params = Arc::new(obf_params.params.clone());
+    let level_width = obf_params.level_width;
+    assert!(inputs.len() % level_width == 0);
+    let depth = obf_params.input_size / level_width;
+    #[cfg(feature = "debug")]
+    let s_init = timed_read(
+        "s_init",
+        || M::read_from_files(&obf_params.params, 1, d + 1, &dir_path, "s_init"),
+        &mut total_load,
+    );
+    #[cfg(feature = "debug")]
+    let minus_t_bar = timed_read(
+        "minus_t_bar",
+        || {
+            use mxx::poly::Poly;
+
+            <<M as PolyMatrix>::P as Poly>::read_from_file(
+                &obf_params.params,
+                &dir_path,
+                "minus_t_bar",
+            )
+        },
+        &mut total_load,
+    );
+
+    #[cfg(feature = "debug")]
+    let (b_stars, durations) = parallel_iter!(0..(depth + 1))
+        .map(|level| {
+            let mut local_duration = Duration::ZERO;
+            let b_star = timed_read(
+                "b_star",
+                || {
+                    M::read_from_files(
+                        params.as_ref(),
+                        (1 + packed_input_size) * (d + 1),
+                        m_b,
+                        &dir_path,
+                        &format!("b_star_{level}"),
+                    )
+                },
+                &mut local_duration,
+            );
+            (b_star, local_duration)
+        })
+        .unzip::<_, _, Vec<_>, Vec<_>>();
+
+    #[cfg(feature = "debug")]
+    {
+        for duration in durations {
+            total_load += duration;
+        }
+    }
+
+    #[cfg(feature = "debug")]
+    if obf_params.hardcoded_key_sigma == 0.0 && obf_params.p_sigma == 0.0 {
+        let one = M::P::const_one(&params);
+        let mut plaintexts = vec![one];
+        plaintexts
+            .extend((0..packed_input_size - 1).map(|_| M::P::const_zero(&params)).collect_vec());
+        plaintexts.push(minus_t_bar.clone());
+        let encoded_bits = M::from_poly_vec_row(&params, plaintexts);
+        let s_connect = encoded_bits.tensor(&s_init);
+        let expected_p_init = s_connect * &b_stars[0];
+        assert_eq!(p_cur, expected_p_init);
+    }
+    // Pack the input bits into little-endian limbs:
+    // for every `level_width`-sized chunk, interpret the Booleans as a binary
+    // number (bit 0 = LSB) and collect the resulting integers.
+    let nums: Vec<u64> = inputs
+        .chunks(level_width)
+        .map(|chunk| {
+            chunk.iter().enumerate().fold(0u64, |acc, (i, &bit)| acc + ((bit as u64) << i))
+        })
+        .collect();
+    debug_assert_eq!(nums.len(), depth);
+    #[cfg(feature = "debug")]
+    let mut s_cur = s_init;
+
+    for (level, num) in nums.iter().enumerate() {
+        let level = level + 1;
+        let k = timed_read(
+            "k",
+            || {
+                M::read_from_files(
+                    params.as_ref(),
+                    m_b,
+                    m_b,
+                    &dir_path,
+                    &format!("k_preimage_{level}_{num}"),
+                )
+            },
+            &mut total_load,
+        );
+        log_mem(format!("k_{}_{} loaded ({},{})", level, num, k.row_size(), k.col_size()));
+        let p = p_cur * k;
+        log_mem(format!("p at {} computed ({},{})", level, p.row_size(), p.col_size()));
+
+        #[cfg(feature = "debug")]
+        if obf_params.hardcoded_key_sigma == 0.0 && obf_params.p_sigma == 0.0 {
+            let s_matrix = timed_read(
+                "s",
+                || {
+                    M::read_from_files(
+                        params.as_ref(),
+                        d + 1,
+                        d + 1,
+                        &dir_path,
+                        &format!("s_{level}_{num}"),
+                    )
+                },
+                &mut total_load,
+            );
+            s_cur = s_cur * s_matrix;
+            let plaintexts = build_poly_vec::<M>(
+                &params,
+                inputs,
+                level_width,
+                level,
+                obf_params.input_size,
+                Some(minus_t_bar.clone()),
+            );
+            let encoded_bits = M::from_poly_vec_row(&params, plaintexts);
+            let s_connect = encoded_bits.tensor(&s_cur);
+            let expected_p = s_connect * &b_stars[level];
+            assert_eq!(p, expected_p, "debug check failed at level {level}");
+        }
+
+        p_cur = p;
+    }
+    let m_b_small = (d + 1) * (2 + log_base_q);
+    let k_plus_one = timed_read(
+        "k_l_plus_one",
+        || M::read_from_files(params.as_ref(), m_b, m_b_small, &dir_path, "k_l_plus_one"),
+        &mut total_load,
+    );
+    let p_l_plus_one = p_cur.clone() * k_plus_one;
+    log_mem(format!(
+        "p_l_plus_one computed ({},{})",
+        p_l_plus_one.row_size(),
+        p_l_plus_one.col_size()
+    ));
+
+    #[cfg(feature = "bgm")]
+    {
+        player.play_music("bgm/eval_bgm2.mp3");
+    }
+
+    let b = timed_read(
+        "b",
+        || M::read_from_files(&obf_params.params, 1, 1, &dir_path, "b"),
+        &mut total_load,
+    );
+    log_mem("b loaded");
+
+    let a_decomposed = public_data.a_rlwe_bar.entry(0, 0).decompose_base(&params);
+    let b_decomposed = &b.entry(0, 0).decompose_base(&params);
+    log_mem("a,b decomposed");
+    let final_circuit = build_final_digits_circuit::<M::P, BggEncoding<M>>(
+        &a_decomposed,
+        b_decomposed,
+        obf_params.public_circuit,
+    );
+    log_mem("final_circuit built");
+    let final_preimage_f = timed_read(
+        "final_preimage_f",
+        || {
+            M::read_from_files(
+                &obf_params.params,
+                m_b_small,
+                packed_output_size,
+                &dir_path,
+                "final_preimage_f",
+            )
+        },
+        &mut total_load,
+    );
+    log_mem("final_preimage loaded");
+    // v := p_l_plus_one * K_F
+    let final_v = p_l_plus_one.clone() * final_preimage_f;
+    log_mem("final_v computed");
+
+    #[cfg(feature = "debug")]
+    if obf_params.hardcoded_key_sigma == 0.0 && obf_params.p_sigma == 0.0 {
+        let eval_outputs_matrix_plus_a_prf = timed_read(
+            "eval_outputs_matrix_plus_a_prf",
+            || {
+                M::read_from_files(
+                    &obf_params.params,
+                    d + 1,
+                    packed_output_size,
+                    &dir_path,
+                    "eval_outputs_matrix_plus_a_prf",
+                )
+            },
+            &mut total_load,
+        );
+        let expected_final_v = s_cur.clone() * eval_outputs_matrix_plus_a_prf;
+        assert_eq!(final_v, expected_final_v);
+        log_mem("final_v debug check passed");
+    }
+    let final_preimage_att = timed_read(
+        "final_preimage_att",
+        || {
+            M::read_from_files(
+                &obf_params.params,
+                m_b,
+                (1 + packed_input_size) * (d + 1) * log_base_q,
+                &dir_path,
+                "final_preimage_att",
+            )
+        },
+        &mut total_load,
+    );
+    // c_att := p * K_att
+    let c_att = p_cur.clone() * final_preimage_att;
+    log_mem(format!("Computed c_att ({}, {})", c_att.row_size(), c_att.col_size()));
+    let pub_key_att = sample_public_key_by_id(&bgg_pubkey_sampler, &params, 0, &reveal_plaintexts);
+    log_mem(format!("Sampled pub_key_att {} ", pub_key_att.len()));
+
+    let m = (d + 1) * log_base_q;
+    #[cfg(not(feature = "debug"))]
+    let polys =
+        build_poly_vec::<M>(&params, inputs, level_width, nums.len(), obf_params.input_size, None);
+    #[cfg(feature = "debug")]
+    let polys = build_poly_vec::<M>(
+        &params,
+        inputs,
+        level_width,
+        nums.len(),
+        obf_params.input_size,
+        Some(minus_t_bar.clone()),
+    );
+
+    #[cfg(feature = "debug")]
+    if obf_params.hardcoded_key_sigma == 0.0 && obf_params.p_sigma == 0.0 {
+        let gadget = M::gadget_matrix(&params, d + 1);
+        let plaintexts = M::from_poly_vec_row(&params, polys.clone());
+        let pubkey = pub_key_att[0].concat_matrix(&pub_key_att[1..]);
+        let inner = pubkey - plaintexts.tensor(&gadget);
+        let expected_c_att = s_cur.clone() * inner;
+        assert_eq!(c_att, expected_c_att);
+        log_mem("c_att debug check passed");
+    }
+
+    let mut new_encodings = vec![];
+    #[cfg(not(feature = "debug"))]
+    let plaintexts_len = pub_key_att.len();
+    for (j, pub_key) in pub_key_att.into_iter().enumerate() {
+        let new_vec = c_att.slice_columns(j * m, (j + 1) * m);
+        #[cfg(feature = "debug")]
+        {
+            let new_encode: BggEncoding<M> =
+                BggEncoding::new(new_vec, pub_key, Some(polys[j].clone()));
+            new_encodings.push(new_encode);
+        }
+
+        #[cfg(not(feature = "debug"))]
+        {
+            let new_encode: BggEncoding<M> = if j == plaintexts_len - 1 {
+                BggEncoding::new(new_vec, pub_key, None)
+            } else {
+                BggEncoding::new(new_vec, pub_key, Some(polys[j].clone()))
+            };
+            new_encodings.push(new_encode);
+        }
+    }
+    let bgg_encoding_plt_evaluator =
+        LweBggEncodingPltEvaluator::<M, SH>::new(hash_key, dir_path.clone(), p_l_plus_one);
+    let output_encodings = final_circuit.eval(
+        params.as_ref(),
+        &new_encodings[0],
+        &new_encodings[1..],
+        Some(bgg_encoding_plt_evaluator),
+    );
+    log_mem("final_circuit evaluated");
+    let output_encoding_ints = output_encodings
+        .par_chunks(log_base_q)
+        .map(|digits| BggEncoding::digits_to_int(digits, &params))
+        .collect::<Vec<_>>();
+    let output_encodings_vec = output_encoding_ints[0].concat_vector(&output_encoding_ints[1..]);
+    log_mem("final_circuit evaluated and recomposed");
+    let z = output_encodings_vec - final_v;
+    log_mem("z computed");
+    debug_assert_eq!(z.size(), (1, packed_output_size));
+    #[cfg(feature = "debug")]
+    if obf_params.hardcoded_key_sigma == 0.0 && obf_params.p_sigma == 0.0 {
+        let hardcoded_key = timed_read(
+            "hardcoded_key",
+            || {
+                use mxx::poly::Poly;
+
+                <<M as PolyMatrix>::P as Poly>::read_from_file(
+                    &obf_params.params,
+                    &dir_path,
+                    "hardcoded_key",
+                )
+            },
+            &mut total_load,
+        );
+        {
+            let expected = s_cur *
+                (output_encoding_ints[0].pubkey.matrix.clone() -
+                    M::unit_column_vector(&params, d + 1, d) *
+                        output_encoding_ints[0].plaintext.clone().unwrap());
+            assert_eq!(output_encoding_ints[0].vector, expected);
+        }
+        if inputs[0] {
+            assert_eq!(
+                output_encoding_ints[0]
+                    .plaintext
+                    .clone()
+                    .unwrap()
+                    .extract_bits_with_threshold(&params),
+                hardcoded_key.to_bool_vec()
+            );
+        }
+        assert_eq!(z.size(), (1, packed_output_size));
+    }
+    log_mem(format!("total loading time {total_load:?}"));
+    z.get_row(0).into_iter().flat_map(|p| p.extract_bits_with_threshold(&params)).collect_vec()
+}
+</file>
+
+<file path="src/io/mod.rs">
+#[cfg(feature = "bgm")]
+pub mod bgm;
+
+pub mod composite_circuit;
+pub mod eval;
+pub mod obf;
+pub mod params;
+pub mod serde;
+pub mod utils;
+</file>
+
+<file path="src/io/obf.rs">
+#[cfg(feature = "bgm")]
+use super::bgm::Player;
+use crate::io::{
+    params::ObfuscationParams,
+    utils::{
+        build_final_digits_circuit, build_u_mask_multi, sample_public_key_by_id, PublicSampledData,
+    },
+};
+use itertools::Itertools;
+#[cfg(feature = "debug")]
+use mxx::storage::store_and_drop_poly;
+use mxx::{
+    bgg::{digits_to_int::DigitsToInt, public_key::BggPublicKey, sampler::BGGPublicKeySampler},
+    lookup::lwe_eval::LweBggPubKeyEvaluator,
+    matrix::PolyMatrix,
+    poly::{Poly, PolyParams},
+    rlwe_enc::rlwe_encrypt,
+    sampler::{DistType, PolyHashSampler, PolyTrapdoorSampler, PolyUniformSampler},
+    storage::{init_storage_system, store_and_drop_matrix, wait_for_all_writes},
+    utils::log_mem,
+};
+use rand::{Rng, RngCore};
+use rayon::{iter::ParallelIterator, slice::ParallelSlice};
+use std::{path::Path, sync::Arc};
+
+pub async fn obfuscate<M, SU, SH, ST, R, P>(
+    obf_params: ObfuscationParams<M>,
+    hardcoded_key: M::P,
+    rng: &mut R,
+    dir_path: P,
+) -> Result<(), Box<dyn std::error::Error + Send + Sync>>
+where
+    M: PolyMatrix + 'static,
+    SU: PolyUniformSampler<M = M> + Send + Sync,
+    SH: PolyHashSampler<[u8; 32], M = M> + Send + Sync,
+    ST: PolyTrapdoorSampler<M = M> + Send + Sync + Clone,
+    R: RngCore,
+    P: AsRef<Path>,
+{
+    #[cfg(feature = "bgm")]
+    let player = Player::new();
+    #[cfg(feature = "bgm")]
+    player.play_music("bgm/obf_bgm1.mp3");
+
+    // Initialize the storage system for async writes
+    init_storage_system();
+
+    let dir_path = dir_path.as_ref().to_path_buf();
+    if !dir_path.exists() {
+        std::fs::create_dir_all(&dir_path).expect("Failed to create directory");
+    }
+
+    let hash_key = rng.random::<[u8; 32]>();
+    let public_data = PublicSampledData::<SH>::sample(&obf_params, hash_key);
+    log_mem("Sampled public data");
+    let params = Arc::new(obf_params.params);
+    let public_circuit = obf_params.public_circuit;
+    let packed_input_size = public_data.packed_input_size;
+    let log_base_q = params.modulus_digits();
+    assert_eq!(public_circuit.num_input(), (2 * log_base_q) + (packed_input_size - 1));
+    let n = params.ring_dimension() as usize;
+    let d = obf_params.d;
+    let sampler_uniform = SU::new();
+    let sampler_trapdoor = ST::new(&params, obf_params.trapdoor_sigma);
+    // sample d+1 public keys explictly
+    let bgg_pubkey_sampler = BGGPublicKeySampler::<_, SH>::new(hash_key, d + 1);
+    let m_b = (1 + packed_input_size) * (d + 1) * (2 + log_base_q);
+    let packed_output_size = public_data.packed_output_size;
+
+    /*
+    =============================================================================
+    We reveal all input slots so the evaluator can multiply encodings,
+    but we keep the secret-key slot (last slot) hidden unless we're in debug mode.
+    In the paper, the last slot corresponds to the FHE secret-key vector t.
+
+    Sample the initial public key (level 0) with our reveal flags.
+
+    The length of encodings_init is (1 + packed_input_size):
+       - 1 the encoding of constant 1
+       - packed_input_size for the packed evaluator inputs and for FHE secret key t
+    =============================================================================
+    */
+
+    // Sample FHE secret key t
+    let t_bar = sampler_uniform.sample_uniform(&params, 1, 1, DistType::BitDist);
+    log_mem("Sampled t_bar");
+    let minus_t_bar = -t_bar.entry(0, 0);
+    #[cfg(feature = "debug")]
+    store_and_drop_poly(minus_t_bar.clone(), &dir_path, "minus_t_bar");
+    // This plaintexts is (1, 0_L, t), total length is L + 2, packed_input_size - 1 is L
+    let one = M::P::const_one(&params);
+    let mut plaintexts = vec![one];
+    plaintexts.extend((0..packed_input_size - 1).map(|_| M::P::const_zero(&params)).collect_vec());
+    plaintexts.push(minus_t_bar);
+
+    let reveal_plaintexts = {
+        let mut reveals = vec![true; packed_input_size + 1];
+        // Only reveal FHE secret key in debug mode.
+        reveals[packed_input_size] = cfg!(feature = "debug");
+        reveals
+    };
+    let s_init = {
+        // Sample BGG+ encoding secret key
+        let s_bars = sampler_uniform.sample_uniform(&params, 1, d, DistType::BitDist).get_row(0);
+        log_mem("Sampled s_bars");
+        let minus_one_poly = <SU::M as PolyMatrix>::P::const_minus_one(&params);
+        let mut secrets = s_bars.to_vec();
+        secrets.push(minus_one_poly);
+        SU::M::from_poly_vec_row(&params, secrets)
+    };
+    log_mem(format!("s_init ({},{}) 1x(d+1)", s_init.row_size(), s_init.col_size()));
+
+    /*
+    =============================================================================
+    Pre‐loop initialization:
+
+    1) Sample input‐dependent random basis B_* (trapdoor & public matrix).
+    2) Compute initial secret key p_init = ((1, 0_L, t) ⊗ s_init)·B_* + error.
+    where 0_L is dummy mask for input space and t is fhe secret key,
+    3) Create I_{d+1}, derive level_width, level_size, and depth.
+    4) For each i in 0..level_size,
+        For each j in 0..depth,
+            U_{j,0} = I_{1 + packed_input_size}
+            U_(j,i) = Matrix to update input bit to 1
+
+    These values (B_*, p_init, I_{d+1}, U_{j, i}) are all set up
+    before entering the main preimage generation loop.
+    =============================================================================
+    */
+
+    // Sample input dependent random matrix B_*
+    let (mut b_star_trapdoor_cur, mut b_star_cur) =
+        sampler_trapdoor.trapdoor(&params, (1 + packed_input_size) * (d + 1));
+    log_mem(format!(
+        "b star epsilon ({},{}) (d+1)L'xm_B and trapdoor epsilon sampled",
+        b_star_cur.row_size(),
+        b_star_cur.col_size()
+    ));
+
+    // Compute p_init
+    let p_init = {
+        let encoded_bits = M::from_poly_vec_row(&params, plaintexts);
+        log_mem(format!("encoded_bits ({},{})", encoded_bits.row_size(), encoded_bits.col_size()));
+        let s_connect = encoded_bits.tensor(&s_init);
+        log_mem(format!("s_connect ({},{})", s_connect.row_size(), s_connect.col_size()));
+        let s_b = s_connect * &b_star_cur;
+        let p_init_error = sampler_uniform.sample_uniform(
+            &params,
+            1,
+            m_b,
+            DistType::GaussDist { sigma: obf_params.p_sigma },
+        );
+        s_b + p_init_error
+    };
+    log_mem(format!("Computed p_epsilon ({},{})", p_init.row_size(), p_init.col_size()));
+    store_and_drop_matrix(p_init, &dir_path, "p_init");
+    #[cfg(feature = "debug")]
+    store_and_drop_matrix(s_init, &dir_path, "s_init");
+    let identity_1_plus_packed_input_size =
+        M::identity(params.as_ref(), 1 + packed_input_size, None);
+    log_mem(format!(
+        "Computed identity_1_plus_packed_input_size {} {}",
+        identity_1_plus_packed_input_size.row_size(),
+        identity_1_plus_packed_input_size.col_size()
+    ));
+    // number of bits to be inserted at each level
+    let level_width = obf_params.level_width;
+    assert_eq!(obf_params.input_size % level_width, 0);
+    // otherwise we need >1 polynomial to insert the bits for each level
+    assert!(level_width <= n);
+    // otherwise we get to a point in which the inserted bits have to be split between two
+    // polynomials
+    if obf_params.input_size > n {
+        assert_eq!(n % level_width, 0);
+    }
+    let level_size = (1u64 << obf_params.level_width) as usize;
+    // number of levels necessary to encode the input
+    let depth = obf_params.input_size / level_width;
+    let mut u_nums = Vec::with_capacity(depth);
+
+    for j in 0..depth {
+        let mut masks_at_level = Vec::with_capacity(level_size);
+        masks_at_level.push(identity_1_plus_packed_input_size.clone());
+        if level_size > 0 {
+            for i in 1..level_size {
+                masks_at_level.push(build_u_mask_multi::<M>(
+                    &params,
+                    packed_input_size,
+                    level_width,
+                    j,
+                    i,
+                ));
+            }
+        }
+
+        u_nums.push(masks_at_level);
+    }
+
+    log_mem(format!("Computed u_0, .. u_{depth}"));
+    #[cfg(feature = "debug")]
+    store_and_drop_matrix(b_star_cur.clone(), &dir_path, "b_star_0");
+
+    /*
+    Trapdoor preimage generation for the input insertion step.
+    For each depth, sample K preimage at the corresponding level size.
+    Level starts from 1 because we already have p_init at level 0.
+    */
+    let one_identity = M::identity(params.as_ref(), 1, None);
+    for level in 1..(depth + 1) {
+        let (b_star_trapdoor_level, b_star_level) =
+            sampler_trapdoor.trapdoor(&params, (1 + packed_input_size) * (d + 1));
+        log_mem(format!(
+            "Sampled b_star ({},{}) and trapdoor for level {}",
+            b_star_level.row_size(),
+            b_star_level.col_size(),
+            level
+        ));
+
+        #[cfg(feature = "debug")]
+        store_and_drop_matrix(b_star_level.clone(), &dir_path, &format!("b_star_{level}"));
+
+        let u_nums_level = &u_nums[level - 1];
+        // Compute each levels in parallel with batching
+        let batch_size =
+            std::env::var("K_BATCH_SIZE").ok().and_then(|s| s.parse::<usize>().ok()).unwrap_or(4);
+        let k_preimages: Vec<_> = (0..level_size)
+            .collect::<Vec<_>>()
+            .par_chunks(batch_size)
+            .flat_map(|batch| {
+                batch
+                    .iter()
+                    .map(|&num| {
+                        #[cfg(feature = "bgm")]
+                        {
+                            player.play_music(format!(
+                                "bgm/obf_bgm{}.mp3",
+                                (2 * level + num) % 3 + 2
+                            ));
+                        }
+
+                        let s_i_bar =
+                            sampler_uniform.sample_uniform(&params, d, d, DistType::BitDist);
+                        let s_i_num = s_i_bar.concat_diag(&[&one_identity]);
+
+                        log_mem(format!(
+                            "Computed S ({},{}) (d+1)x(d+1)",
+                            s_i_num.row_size(),
+                            s_i_num.col_size()
+                        ));
+                        let u = &u_nums_level[num];
+                        log_mem(format!("Get U ({},{}) L'xL'", u.row_size(), u.col_size()));
+                        let u_tensor_s = u.tensor(&s_i_num);
+                        let k_target_error = sampler_uniform.sample_uniform(
+                            &params,
+                            (1 + packed_input_size) * (d + 1),
+                            m_b,
+                            DistType::GaussDist { sigma: obf_params.p_sigma },
+                        );
+                        log_mem(format!(
+                            "Computed U ⊗ S ({},{})",
+                            u_tensor_s.row_size(),
+                            u_tensor_s.col_size()
+                        ));
+                        let k_target = (u_tensor_s * &b_star_level) + k_target_error;
+                        let k_preimage_num = sampler_trapdoor.preimage(
+                            &params,
+                            &b_star_trapdoor_cur,
+                            &b_star_cur,
+                            &k_target,
+                        );
+                        log_mem(format!(
+                            "Computed k_preimage_num ({},{})",
+                            k_preimage_num.row_size(),
+                            k_preimage_num.col_size()
+                        ));
+
+                        #[cfg(feature = "debug")]
+                        {
+                            (num, Some(s_i_num), k_preimage_num)
+                        }
+                        #[cfg(not(feature = "debug"))]
+                        {
+                            (num, None::<M>, k_preimage_num)
+                        }
+                    })
+                    .collect::<Vec<_>>()
+            })
+            .collect();
+
+        // Store matrices sequentially to avoid Tokio context issues.
+        for (num, _s_i_num_opt, k_preimage_num) in k_preimages {
+            #[cfg(feature = "debug")]
+            if let Some(s_i_num) = _s_i_num_opt {
+                store_and_drop_matrix(s_i_num, &dir_path, &format!("s_{level}_{num}"));
+            }
+            store_and_drop_matrix(k_preimage_num, &dir_path, &format!("k_preimage_{level}_{num}"));
+        }
+
+        b_star_trapdoor_cur = b_star_trapdoor_level;
+        b_star_cur = b_star_level;
+    }
+
+    /*
+    =============================================================================
+     Preimage‐generation for final BGG+ encoding evaluation step (after all bit insertion)
+
+     1) Build the "final digits" circuit f[x_L] from a_decomposed, b_decomposed and the public circuit.
+     2) Evaluate f[x_L] on (C = {a_decomposed, b_decomposed}, public key bits…).
+     3) Form the target matrix Y = (eval_outputs_matrix + a_prf).
+     4) Sample a trapdoor preimage of Y under b_l_plus_one.
+    =============================================================================
+    */
+
+    // Sample input dependent random matrix B_*
+    let (b_l_plus_one_trapdoor, b_l_plus_one) = sampler_trapdoor.trapdoor(&params, d + 1);
+    let k_l_plus_one = {
+        let k_l_plus_one_target = {
+            let id = M::identity(&params, d + 1, None);
+            let zeros = M::zero(&params, packed_input_size * id.row_size(), id.col_size());
+            let tensor_lhs = id.concat_rows(&[&zeros]);
+            tensor_lhs * &b_l_plus_one
+        };
+        sampler_trapdoor.preimage(&params, &b_star_trapdoor_cur, &b_star_cur, &k_l_plus_one_target)
+    };
+    store_and_drop_matrix(k_l_plus_one, &dir_path, "k_l_plus_one");
+
+    #[cfg(feature = "bgm")]
+    {
+        player.play_music("bgm/obf_bgm5.mp3");
+    }
+
+    // Sample A_att
+    let pub_key_att = sample_public_key_by_id(&bgg_pubkey_sampler, &params, 0, &reveal_plaintexts);
+    let (first_key, other_keys) =
+        pub_key_att.split_first().expect("pub_key_att must contain at least one key");
+    let pub_key_att_matrix: M = first_key.concat_matrix(other_keys);
+    log_mem(format!(
+        "Sampled pub_key_att_matrix ({},{})",
+        pub_key_att_matrix.row_size(),
+        pub_key_att_matrix.col_size()
+    ));
+    #[cfg(feature = "debug")]
+    store_and_drop_poly(hardcoded_key.clone(), &dir_path, "hardcoded_key");
+    let hardcoded_key_matrix = M::from_poly_vec_row(&params, vec![hardcoded_key]);
+
+    // Generate RLWE ciphertext for the hardcoded key
+    let sampler_uniform = SU::new();
+    let a = public_data.a_rlwe_bar;
+    let b = rlwe_encrypt(
+        params.as_ref(),
+        &sampler_uniform,
+        &t_bar,
+        &a,
+        &hardcoded_key_matrix,
+        obf_params.hardcoded_key_sigma,
+    );
+    log_mem("Generated RLWE ciphertext {a, b}");
+
+    // Decompose RLWE ciphertext. This is required to lower down error growth for BGG+ encoding
+    // evaluation.
+    let a_decomposed = a.entry(0, 0).decompose_base(params.as_ref());
+    let b_decomposed = b.entry(0, 0).decompose_base(params.as_ref());
+    log_mem("Decomposed RLWE ciphertext into {BaseDecompose(a), BaseDecompose(b)}");
+    store_and_drop_matrix(b, &dir_path, "b");
+
+    // P_att := u_1_L' ⊗ A_att - I_L' ⊗ G_d+1
+    // computing u_1_L' ⊗ A_att
+    let k_lhs = {
+        let zeros = M::zero(
+            &params,
+            packed_input_size * pub_key_att_matrix.row_size(),
+            pub_key_att_matrix.col_size(),
+        );
+        pub_key_att_matrix.concat_rows(&[&zeros])
+    };
+
+    // computing I_L' ⊗ G_d+1
+    let final_preimage_att = {
+        let gadget = M::gadget_matrix(&params, d + 1);
+        let other_blocks: Vec<&M> = std::iter::repeat_n(&gadget, packed_input_size).collect();
+        let k_rhs = gadget.concat_diag(&other_blocks);
+        let final_preimage_target_att = k_lhs - k_rhs;
+        sampler_trapdoor.preimage(
+            &params,
+            &b_star_trapdoor_cur,
+            &b_star_cur,
+            &final_preimage_target_att,
+        )
+    };
+    log_mem("Sampled final_preimage_att");
+    store_and_drop_matrix(final_preimage_att, &dir_path, "final_preimage_att");
+    store_and_drop_matrix(pub_key_att_matrix, &dir_path, "pub_key_att");
+
+    let b_l_plus_one = Arc::new(b_l_plus_one);
+    let b_l_plus_one_trapdoor = Arc::new(b_l_plus_one_trapdoor);
+    // P_F := A_F + A_p
+    let final_preimage_target_f = {
+        let final_circuit = build_final_digits_circuit::<M::P, BggPublicKey<M>>(
+            &a_decomposed,
+            &b_decomposed,
+            public_circuit,
+        );
+        log_mem("Computed final_circuit");
+
+        let bgg_plt_evaluator = LweBggPubKeyEvaluator::<M, SH, ST>::new(
+            hash_key,
+            sampler_trapdoor.clone(),
+            b_l_plus_one.clone(),
+            b_l_plus_one_trapdoor.clone(),
+            dir_path.clone(),
+        );
+        let eval_outputs = final_circuit.eval(
+            params.as_ref(),
+            &pub_key_att[0],
+            &pub_key_att[1..],
+            Some(bgg_plt_evaluator),
+        );
+        log_mem("Evaluated outputs");
+        debug_assert_eq!(eval_outputs.len(), log_base_q * packed_output_size);
+
+        let output_ints = eval_outputs
+            .par_chunks(log_base_q)
+            .map(|digits| BggPublicKey::digits_to_int(digits, &params))
+            .collect::<Vec<_>>();
+        let eval_outputs_matrix = output_ints[0].concat_matrix(&output_ints[1..]);
+        #[cfg(feature = "debug")]
+        assert_eq!(eval_outputs_matrix.col_size(), packed_output_size);
+        #[cfg(feature = "debug")]
+        store_and_drop_matrix(
+            eval_outputs_matrix.clone() + public_data.a_prf.clone(),
+            &dir_path,
+            "eval_outputs_matrix_plus_a_prf",
+        );
+        eval_outputs_matrix + public_data.a_prf
+    };
+    log_mem("Computed final_preimage_target_f");
+
+    let final_preimage_f = sampler_trapdoor.preimage(
+        &params,
+        &b_l_plus_one_trapdoor,
+        &b_l_plus_one,
+        &final_preimage_target_f,
+    );
+    log_mem("Sampled final_preimage_f");
+    store_and_drop_matrix(final_preimage_f, &dir_path, "final_preimage_f");
+
+    let path = dir_path.join("hash_key");
+    std::fs::write(&path, hash_key).expect("Failed to write hash_key file");
+    log_mem("Stored hash_key");
+
+    // Wait for all async writes to complete before finishing
+    wait_for_all_writes().await?;
+    log_mem("All matrix writes completed - obfuscation finished");
+
+    Ok(())
+}
+</file>
+
+<file path="src/io/params.rs">
+use mxx::{
+    circuit::PolyCircuit,
+    matrix::PolyMatrix,
+    poly::{Poly, PolyParams},
+};
+
+#[derive(Debug, Clone)]
+pub struct ObfuscationParams<M: PolyMatrix> {
+    pub params: <<M as PolyMatrix>::P as Poly>::Params,
+    pub switched_modulus: <<<M as PolyMatrix>::P as Poly>::Params as PolyParams>::Modulus,
+    pub input_size: usize,
+    pub level_width: usize, // number of bits to be inserted at each level
+    pub public_circuit: PolyCircuit<M::P>,
+    /// number of secret key polynomials. This used due to module LWE assumption.
+    pub d: usize,
+    pub p_sigma: f64,
+    pub hardcoded_key_sigma: f64,
+    pub trapdoor_sigma: f64,
+}
+</file>
+
+<file path="src/io/serde.rs">
+use std::{path::PathBuf, str::FromStr};
+
+use num_bigint::BigUint;
+use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
+
+fn biguint_to_string<S>(value: &BigUint, serializer: S) -> Result<S::Ok, S::Error>
+where
+    S: Serializer,
+{
+    serializer.serialize_str(&value.to_str_radix(10))
+}
+
+fn biguint_from_string<'de, D>(deserializer: D) -> Result<BigUint, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let s = String::deserialize(deserializer)?;
+    BigUint::from_str(&s).map_err(de::Error::custom)
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SerializableObfuscationParams {
+    #[serde(serialize_with = "biguint_to_string", deserialize_with = "biguint_from_string")]
+    pub switched_modulus: BigUint,
+    pub input_size: usize,
+    pub level_width: usize,
+    pub public_circuit_path: PathBuf,
+    pub d: usize,
+    pub hardcoded_key_sigma: f64,
+    pub p_sigma: f64,
+    pub trapdoor_sigma: f64,
+}
+</file>
+
+<file path="src/io/utils.rs">
+use std::marker::PhantomData;
+
+use crate::io::composite_circuit::build_composite_circuit_from_public_and_fhe_dec;
+use mxx::{
+    bgg::{public_key::BggPublicKey, sampler::BGGPublicKeySampler},
+    circuit::{Evaluable, PolyCircuit},
+    element::PolyElem,
+    matrix::PolyMatrix,
+    poly::{Poly, PolyParams},
+    sampler::{DistType, PolyHashSampler},
+};
+
+use super::params::ObfuscationParams;
+
+const TAG_A_RLWE_BAR: &[u8] = b"A_RLWE_BAR";
+const TAG_A_PRF: &[u8] = b"A_PRF:";
+pub const TAG_BGG_PUBKEY_INPUT_PREFIX: &[u8] = b"BGG_PUBKEY_INPUT:";
+
+pub fn sample_public_key_by_id<K: AsRef<[u8]>, S>(
+    sampler: &BGGPublicKeySampler<K, S>,
+    params: &<<<S as PolyHashSampler<K>>::M as PolyMatrix>::P as Poly>::Params,
+    id: usize,
+    reveal_plaintexts: &[bool],
+) -> Vec<BggPublicKey<<S as PolyHashSampler<K>>::M>>
+where
+    S: PolyHashSampler<K>,
+{
+    sampler.sample(
+        params,
+        &[TAG_BGG_PUBKEY_INPUT_PREFIX, &(id as u64).to_le_bytes()].concat(),
+        reveal_plaintexts,
+    )
+}
+
+#[derive(Debug, Clone)]
+pub struct PublicSampledData<S: PolyHashSampler<[u8; 32]>> {
+    pub a_rlwe_bar: S::M,
+    pub a_prf: S::M,
+    pub packed_input_size: usize,
+    pub packed_output_size: usize,
+    _s: PhantomData<S>,
+}
+
+impl<S: PolyHashSampler<[u8; 32]>> PublicSampledData<S> {
+    pub fn sample(obf_params: &ObfuscationParams<S::M>, hash_key: [u8; 32]) -> Self {
+        let hash_sampler = S::new();
+        let params = &obf_params.params;
+        let d = obf_params.d;
+        let log_base_q = params.modulus_digits();
+        let dim = params.ring_dimension() as usize;
+        // input bits, poly of the FHE key, it contains 1 for the FHE key (t)
+        let packed_input_size = obf_params.input_size.div_ceil(dim) + 1;
+        let packed_output_size = obf_params.public_circuit.num_output() / (2 * log_base_q);
+        let a_rlwe_bar =
+            hash_sampler.sample_hash(params, hash_key, TAG_A_RLWE_BAR, 1, 1, DistType::FinRingDist);
+
+        let a_prf_raw = hash_sampler.sample_hash(
+            params,
+            hash_key,
+            TAG_A_PRF,
+            d + 1,
+            packed_output_size,
+            DistType::FinRingDist,
+        );
+        let a_prf = a_prf_raw.modulus_switch(&obf_params.switched_modulus);
+        Self { a_rlwe_bar, a_prf, packed_input_size, packed_output_size, _s: PhantomData }
+    }
+}
+
+pub fn build_final_digits_circuit<P: Poly, E: Evaluable>(
+    a_decomposed_polys: &[P],
+    b_decomposed_polys: &[P],
+    public_circuit: PolyCircuit<E::P>,
+) -> PolyCircuit<E::P> {
+    let log_base_q = a_decomposed_polys.len();
+    debug_assert_eq!(b_decomposed_polys.len(), log_base_q);
+    let packed_eval_input_size = public_circuit.num_input() - (2 * log_base_q);
+    let lookups = public_circuit.lookups.clone();
+
+    // circuit outputs the cipertext ct=(a,b) as a_base_0, b_base_0, a_base_1, b_base_1, ...
+    let mut ct_output_circuit = PolyCircuit::new();
+    {
+        let inputs = ct_output_circuit.input(packed_eval_input_size);
+        let circuit_id = ct_output_circuit.register_sub_circuit(public_circuit);
+        let mut public_circuit_inputs = vec![];
+        for poly in a_decomposed_polys.iter() {
+            let digits = poly.coeffs_digits();
+            public_circuit_inputs.push(ct_output_circuit.const_digits_poly(&digits));
+        }
+        for poly in b_decomposed_polys.iter() {
+            let digits = poly.coeffs_digits();
+            public_circuit_inputs.push(ct_output_circuit.const_digits_poly(&digits));
+        }
+        public_circuit_inputs.extend(inputs);
+        assert_eq!(public_circuit_inputs.len(), 2 * log_base_q + packed_eval_input_size);
+        let pc_outputs = ct_output_circuit.call_sub_circuit(circuit_id, &public_circuit_inputs);
+        let mut outputs = Vec::with_capacity(pc_outputs.len());
+        // n is the number of ciphertexts
+        let n = pc_outputs.len() / (2 * log_base_q);
+        for ct_idx in 0..n {
+            let ct_offset = ct_idx * 2 * log_base_q;
+            for bit_idx in 0..log_base_q {
+                let a_index = ct_offset + bit_idx;
+                let b_index = ct_offset + log_base_q + bit_idx;
+                let a_bit = pc_outputs[a_index];
+                let b_bit = pc_outputs[b_index];
+                outputs.push(a_bit);
+                outputs.push(b_bit);
+            }
+        }
+        ct_output_circuit.output(outputs);
+    }
+
+    // actual
+    let mut circuit = PolyCircuit::new();
+    {
+        let inputs = circuit.input(packed_eval_input_size + 1); // + 1 is for -t_bar
+        let sub_circuit =
+            build_composite_circuit_from_public_and_fhe_dec::<E>(ct_output_circuit, log_base_q);
+        let circuit_id = circuit.register_sub_circuit(sub_circuit);
+        let outputs = circuit.call_sub_circuit(circuit_id, &inputs);
+        circuit.lookups = lookups;
+        circuit.output(outputs);
+    }
+    circuit
+}
+
+pub fn build_u_mask_multi<M: PolyMatrix>(
+    params: &<<M as PolyMatrix>::P as Poly>::Params,
+    packed_input_size: usize, // L
+    level_width: usize,       // w
+    depth_j: usize,           // j
+    combo_b: usize,           // 0 ≤ b < 2^w
+) -> M {
+    // L' = 1 (t) + L packed-input slots (evaluator's input + const-one slot)
+    let l_dash = 1 + packed_input_size;
+
+    // U_{j,0}  ≡  identity
+    if combo_b == 0 {
+        return M::identity(params, l_dash, None);
+    }
+
+    // Start from the identity and zero out the diagonal entry
+    // for every bit that is 1 in combo_b.
+    let mut u = M::identity(params, l_dash, None);
+    let mut zero = M::P::const_zero(params);
+
+    for r in 0..level_width {
+        if (combo_b >> r) & 1 == 1 {
+            let idx = depth_j * level_width + r;
+            assert!(
+                idx < packed_input_size * params.ring_dimension() as usize,
+                "index out of range"
+            );
+            let mut cs = zero.coeffs();
+            debug_assert!(idx < cs.len(), "index out of bounds");
+            cs[idx] = <M::P as Poly>::Elem::one(&params.modulus());
+            zero = M::P::from_coeffs(params, &cs);
+        }
+    }
+
+    u.set_entry(0, 1, zero);
+
+    u
+}
+
+pub fn build_poly_vec<M: PolyMatrix>(
+    params: &<<M as PolyMatrix>::P as Poly>::Params,
+    inputs: &[bool],
+    level_width: usize,
+    level: usize,
+    input_size: usize,
+    minus_t_bar: Option<M::P>,
+) -> Vec<M::P> {
+    let bits_done = level_width * level;
+    let dim = params.ring_dimension() as usize;
+    let mut polys: Vec<M::P> = vec![<M::P as Poly>::const_one(params)];
+    let mut coeffs = inputs[..bits_done]
+        .iter()
+        .map(|&b| {
+            if b {
+                <M::P as Poly>::Elem::one(&params.modulus())
+            } else {
+                <M::P as Poly>::Elem::zero(&params.modulus())
+            }
+        })
+        .collect::<Vec<_>>();
+    coeffs.extend(std::iter::repeat_n(
+        <M::P as Poly>::Elem::zero(&params.modulus()),
+        input_size - bits_done,
+    ));
+
+    polys.extend(coeffs.chunks(dim).map(|c| M::P::from_coeffs(params, c)));
+    if let Some(minus_t_bar) = minus_t_bar {
+        polys.push(minus_t_bar);
+    }
+    polys
+}
+
+#[cfg(test)]
+mod test {
+    use mxx::{
+        bgg::digits_to_int::DigitsToInt,
+        lookup::poly::PolyPltEvaluator,
+        poly::{
+            dcrt::{params::DCRTPolyParams, poly::DCRTPoly},
+            PolyParams,
+        },
+        rlwe_enc::rlwe_encrypt,
+        sampler::{uniform::DCRTPolyUniformSampler, PolyUniformSampler},
+    };
+    use num_bigint::BigUint;
+    use num_traits::One;
+
+    use super::*;
+
+    #[test]
+    fn test_build_final_step_circuit() {
+        // 1. Set up parameters
+        let params = DCRTPolyParams::default();
+        let log_q = params.modulus_bits();
+        let sampler_uniform = DCRTPolyUniformSampler::new();
+        let sigma = 3.0;
+        let log_base_q = params.modulus_digits();
+
+        // 2. Create a simple public circuit that takes 2*log_q inputs and outputs them directly
+        let mut public_circuit = PolyCircuit::new();
+        // inputs: BaseDecompose(ct), eval_input
+        // outputs: BaseDecompose(ct) AND eval_input
+        {
+            let inputs = public_circuit.input((2 * log_base_q) + 1);
+            let mut outputs = vec![];
+            let eval_input = inputs[2 * log_base_q];
+            for ct_input in inputs[0..2 * log_base_q].iter() {
+                let muled = public_circuit.and_gate(*ct_input, eval_input);
+                outputs.push(muled);
+            }
+            public_circuit.output(outputs);
+        }
+
+        // 3. Generate a random hardcoded key
+        let hardcoded_key = sampler_uniform.sample_uniform(&params, 1, 1, DistType::BitDist);
+
+        // 4. Generate RLWE ciphertext for the hardcoded key
+        let a_rlwe_bar = sampler_uniform.sample_uniform(&params, 1, 1, DistType::BitDist);
+        let t_bar_matrix = sampler_uniform.sample_uniform(&params, 1, 1, DistType::BitDist);
+
+        let b = rlwe_encrypt(
+            &params,
+            &sampler_uniform,
+            &t_bar_matrix,
+            &a_rlwe_bar,
+            &hardcoded_key,
+            sigma,
+        );
+
+        // 5. Decompose the ciphertext
+        let a_decomposed = a_rlwe_bar.entry(0, 0).decompose_base(&params);
+        let b_decomposed = b.entry(0, 0).decompose_base(&params);
+
+        // 6. Build the final circuit with DCRTPoly as the Evaluable type
+        let final_circuit = build_final_digits_circuit::<DCRTPoly, DCRTPoly>(
+            &a_decomposed,
+            &b_decomposed,
+            public_circuit,
+        );
+
+        // 7. Evaluate the circuit
+        let one = DCRTPoly::const_one(&params);
+
+        let mut inputs = vec![one.clone()];
+        inputs.push(-(t_bar_matrix.entry(0, 0)).clone());
+
+        let circuit_outputs = final_circuit.eval(&params, &one, &inputs, None::<PolyPltEvaluator>);
+        assert_eq!(circuit_outputs.len(), log_q);
+
+        // 8. Extract the output bits
+        let output_ints = circuit_outputs
+            .chunks(log_q)
+            .map(|bits| DCRTPoly::digits_to_int(bits, &params))
+            .collect::<Vec<_>>();
+        assert_eq!(output_ints.len(), 1);
+        let output_bits = output_ints
+            .iter()
+            .flat_map(|output| output.extract_bits_with_threshold(&params))
+            .collect::<Vec<_>>();
+
+        // 9. Verify that the output matches the hardcoded key bits
+        assert_eq!(output_bits.len(), params.ring_dimension() as usize);
+        assert_eq!(output_bits, hardcoded_key.entry(0, 0).to_bool_vec());
+    }
+
+    #[test]
+    fn test_simulate_norm_final_bits_circuit() {
+        // 1. Set up parameters
+        let log_n = 13u32;
+        let n = 2u32.pow(log_n);
+        let crt_depth = 12;
+        let crt_bits = 51;
+        let base_bits = 20;
+        let params = DCRTPolyParams::new(n, crt_depth, crt_bits, base_bits);
+        let log_q = params.modulus_bits();
+        debug_assert_eq!(crt_bits * crt_depth, log_q);
+        let log_base_q = params.modulus_digits();
+
+        // 2. Create a simple public circuit that takes log_base_q inputs and outputs them directly
+        let mut public_circuit = PolyCircuit::new();
+        // inputs: BaseDecompose(ct), eval_input
+        // outputs: BaseDecompose(ct) AND eval_input
+        {
+            let inputs = public_circuit.input((2 * log_base_q) + 1);
+            let mut outputs = vec![];
+            let eval_input = inputs[2 * log_base_q];
+            for ct_input in inputs[0..2 * log_base_q].iter() {
+                let muled = public_circuit.and_gate(*ct_input, eval_input);
+                outputs.push(muled);
+            }
+            public_circuit.output(outputs);
+        }
+
+        let a_rlwe_bar = DCRTPoly::const_max(&params);
+        let b = DCRTPoly::const_max(&params);
+
+        let a_decomposed_polys = a_rlwe_bar.decompose_base(&params);
+        let b_decomposed_polys = b.decompose_base(&params);
+        let final_circuit = build_final_digits_circuit::<DCRTPoly, DCRTPoly>(
+            &a_decomposed_polys,
+            &b_decomposed_polys,
+            public_circuit,
+        );
+
+        let packed_input_norms = vec![BigUint::one(), params.modulus().as_ref().clone()];
+        let norms = final_circuit.simulate_bgg_norm(
+            params.ring_dimension(),
+            params.base_bits(),
+            packed_input_norms,
+        );
+        let norm_json = serde_json::to_string(&norms).unwrap();
+        use std::{fs::File, io::Write};
+        let mut file = File::create(format!(
+            "final_bits_norm_n_{}_crt_{}_depth_{}_base_{}.json",
+            log_n, crt_bits, crt_depth, base_bits
+        ))
+        .unwrap();
+        file.write_all(norm_json.as_bytes()).unwrap();
+    }
+}
+</file>
+
+<file path="src/lib.rs">
+#![allow(clippy::needless_range_loop)]
+#![allow(clippy::too_many_arguments)]
+
+pub mod io;
+pub mod test_utils;
+pub mod utils;
+</file>
+
+<file path="src/test_utils.rs">
+use crate::{
+    io::{eval::evaluate, obf::obfuscate, params::ObfuscationParams},
+    utils::{calculate_directory_size, init_tracing},
+};
+use keccak_asm::Keccak256;
+use mxx::{
+    circuit::PolyCircuit,
+    lookup::PublicLut,
+    matrix::dcrt_poly::DCRTPolyMatrix,
+    poly::{
+        dcrt::{params::DCRTPolyParams, poly::DCRTPoly},
+        Poly, PolyParams,
+    },
+    sampler::{
+        hash::DCRTPolyHashSampler, trapdoor::DCRTPolyTrapdoorSampler,
+        uniform::DCRTPolyUniformSampler, DistType, PolyUniformSampler,
+    },
+    utils::log_mem,
+};
+use num_bigint::BigUint;
+use num_traits::Num;
+use rand::{rng, Rng};
+use std::{collections::HashMap, fs, path::Path, sync::Arc};
+use tracing::info;
+
+const SIGMA: f64 = 4.578;
+
+pub async fn test_io_common(
+    ring_dim: u32,
+    crt_depth: usize,
+    crt_bits: usize,
+    base_bits: u32,
+    switched_modulus_str: &str,
+    d: usize,
+    input_size: usize,
+    level_width: usize,
+    p_sigma: f64,
+    hardcoded_key_sigma: f64,
+    dir_path: &str,
+) {
+    init_tracing();
+    let dir = Path::new(&dir_path);
+    if !dir.exists() {
+        fs::create_dir(dir).unwrap();
+    } else {
+        // Clean it first to ensure no old files interfere
+        fs::remove_dir_all(dir).unwrap();
+        fs::create_dir(dir).unwrap();
+    }
+
+    let start_time = std::time::Instant::now();
+    let params = DCRTPolyParams::new(ring_dim, crt_depth, crt_bits, base_bits);
+    let log_base_q = params.modulus_digits();
+    let switched_modulus = Arc::new(BigUint::from_str_radix(switched_modulus_str, 10).unwrap());
+    let mut public_circuit = PolyCircuit::new();
+
+    // inputs: BaseDecompose(ct), eval_input
+    // outputs: BaseDecompose(ct) AND eval_input
+    {
+        let inputs = public_circuit.input((2 * log_base_q) + 1);
+        let mut outputs = vec![];
+        let eval_input = inputs[2 * log_base_q];
+        for ct_input in inputs[0..2 * log_base_q].iter() {
+            let muled = public_circuit.and_gate(*ct_input, eval_input);
+            outputs.push(muled);
+        }
+        public_circuit.output(outputs);
+    }
+
+    let obf_params = ObfuscationParams {
+        params: params.clone(),
+        switched_modulus,
+        input_size,
+        level_width,
+        public_circuit: public_circuit.clone(),
+        d,
+        p_sigma,
+        hardcoded_key_sigma,
+        trapdoor_sigma: SIGMA,
+    };
+
+    let sampler_uniform = DCRTPolyUniformSampler::new();
+    let mut rng = rand::rng();
+    let hardcoded_key = sampler_uniform.sample_poly(&params, &DistType::BitDist);
+
+    obfuscate::<
+        DCRTPolyMatrix,
+        DCRTPolyUniformSampler,
+        DCRTPolyHashSampler<Keccak256>,
+        DCRTPolyTrapdoorSampler,
+        _,
+        _,
+    >(obf_params.clone(), hardcoded_key.clone(), &mut rng, &dir_path)
+    .await
+    .expect("obfuscation fail");
+    let obfuscation_time = start_time.elapsed();
+    info!("Time to obfuscate: {:?}", obfuscation_time);
+
+    let obf_size = calculate_directory_size(dir_path);
+    log_mem(format!("Obfuscation size: {obf_size} bytes"));
+
+    let bool_in = rng.random::<bool>();
+    let mut input = vec![bool_in];
+    input.append(&mut vec![false; input_size - 1]);
+
+    let start_time = std::time::Instant::now();
+    let output =
+        evaluate::<DCRTPolyMatrix, DCRTPolyHashSampler<Keccak256>, DCRTPolyTrapdoorSampler, _>(
+            obf_params, &input, &dir_path,
+        );
+    let eval_time = start_time.elapsed();
+    info!("Time for evaluation: {:?}", eval_time);
+    info!("Total time: {:?}", obfuscation_time + eval_time);
+    let input_poly = DCRTPoly::from_usize_to_constant(&params, bool_in as usize);
+    assert_eq!(output, (hardcoded_key * input_poly).to_bool_vec());
+}
+
+pub async fn test_io_plt(
+    ring_dim: u32,
+    crt_depth: usize,
+    crt_bits: usize,
+    base_bits: u32,
+    switched_modulus_str: &str,
+    d: usize,
+    input_size: usize,
+    level_width: usize,
+    p_sigma: f64,
+    hardcoded_key_sigma: f64,
+    dir_path: &str,
+) {
+    init_tracing();
+    let dir = Path::new(&dir_path);
+    if !dir.exists() {
+        fs::create_dir(dir).unwrap();
+    } else {
+        // Clean it first to ensure no old files interfere
+        fs::remove_dir_all(dir).unwrap();
+        fs::create_dir(dir).unwrap();
+    }
+
+    let start_time = std::time::Instant::now();
+    let params = DCRTPolyParams::new(ring_dim, crt_depth, crt_bits, base_bits);
+    let log_base_q = params.modulus_digits();
+    let switched_modulus = Arc::new(BigUint::from_str_radix(switched_modulus_str, 10).unwrap());
+    let mut public_circuit = PolyCircuit::new();
+
+    let plt = setup_lsb_constant_binary_plt(8, &params);
+    // inputs: BaseDecompose(ct), eval_input
+    // outputs: (eval_input PLT) * BaseDecompose(ct)
+    {
+        let inputs = public_circuit.input((2 * log_base_q) + 1);
+        let mut outputs = vec![];
+        let eval_input = inputs[2 * log_base_q];
+        let plt_id = public_circuit.register_public_lookup(plt.clone());
+        let plt_out = public_circuit.public_lookup_gate(eval_input, plt_id);
+        for ct_input in inputs[0..2 * log_base_q].iter() {
+            let muled = public_circuit.mul_gate(*ct_input, plt_out);
+            outputs.push(muled);
+        }
+        public_circuit.output(outputs);
+    }
+
+    let obf_params = ObfuscationParams {
+        params: params.clone(),
+        switched_modulus,
+        input_size,
+        level_width,
+        public_circuit: public_circuit.clone(),
+        d,
+        p_sigma,
+        hardcoded_key_sigma,
+        trapdoor_sigma: SIGMA,
+    };
+
+    let sampler_uniform = DCRTPolyUniformSampler::new();
+    let mut rng = rand::rng();
+    let hardcoded_key = sampler_uniform.sample_poly(&params, &DistType::BitDist);
+
+    obfuscate::<
+        DCRTPolyMatrix,
+        DCRTPolyUniformSampler,
+        DCRTPolyHashSampler<Keccak256>,
+        DCRTPolyTrapdoorSampler,
+        _,
+        _,
+    >(obf_params.clone(), hardcoded_key.clone(), &mut rng, &dir_path)
+    .await
+    .expect("obfuscation fail");
+    let obfuscation_time = start_time.elapsed();
+    info!("Time to obfuscate: {:?}", obfuscation_time);
+
+    let obf_size = calculate_directory_size(dir_path);
+    log_mem(format!("Obfuscation size: {obf_size} bytes"));
+
+    let input = vec![false, true, true];
+    let input_poly = DCRTPoly::from_bool_vec(&params, &input);
+    let start_time = std::time::Instant::now();
+    let output =
+        evaluate::<DCRTPolyMatrix, DCRTPolyHashSampler<Keccak256>, DCRTPolyTrapdoorSampler, _>(
+            obf_params, &input, &dir_path,
+        );
+    let eval_time = start_time.elapsed();
+    info!("output: {:?}", output);
+    info!("Time for evaluation: {:?}", eval_time);
+    info!("Total time: {:?}", obfuscation_time + eval_time);
+
+    let (_, scale) = plt.f.get(&input_poly).expect("x_k doesn't exist on the PLT");
+    assert_eq!(output, (hardcoded_key * scale).to_bool_vec());
+}
+
+/// only used for `test_io_plt` to map either [true, ...] or [false, ...] format
+fn setup_lsb_constant_binary_plt(t_n: usize, params: &DCRTPolyParams) -> PublicLut<DCRTPoly> {
+    let mut f = HashMap::new();
+    let mut rng = rng();
+    for k in 0..t_n {
+        let r_val: usize = rng.random_range(0..2_usize);
+        f.insert(
+            DCRTPoly::from_usize_to_lsb(params, k),
+            (k, DCRTPoly::from_usize_to_constant(params, r_val)),
+        );
+    }
+
+    PublicLut::<DCRTPoly>::new(f)
+}
+
+pub fn setup_lsb_plt(t_n: usize, params: &DCRTPolyParams) -> PublicLut<DCRTPoly> {
+    let mut f = HashMap::new();
+    for k in 0..t_n {
+        let r_val: usize = t_n - k;
+        f.insert(
+            DCRTPoly::from_usize_to_lsb(params, k),
+            (k, DCRTPoly::from_usize_to_lsb(params, r_val)),
+        );
+    }
+
+    PublicLut::<DCRTPoly>::new(f)
+}
+
+pub fn setup_constant_plt(t_n: usize, params: &DCRTPolyParams) -> PublicLut<DCRTPoly> {
+    let mut f = HashMap::new();
+    let mut rng = rng();
+    for k in 0..t_n {
+        let r_val: usize = rng.random_range(0..t_n);
+        f.insert(
+            DCRTPoly::from_usize_to_constant(params, k),
+            (k, DCRTPoly::from_usize_to_constant(params, r_val)),
+        );
+    }
+
+    PublicLut::<DCRTPoly>::new(f)
+}
+</file>
+
+<file path="src/utils.rs">
+use num_bigint::BigUint;
+use num_traits::{One, Zero};
+use rayon::prelude::*;
+use std::{env, path::Path};
+#[cfg(feature = "disk")]
+use tempfile::env::temp_dir;
+use walkdir::WalkDir;
+
+/// ideal thread chunk size for parallel
+pub fn chunk_size_for(original: usize) -> usize {
+    match original {
+        0..=2048 => 128,
+        2049..=4096 => 256,
+        4097..=8192 => 512,
+        _ => 1024,
+    }
+}
+
+pub fn ceil_log2(q: &BigUint) -> usize {
+    assert!(!q.is_zero(), "log2 is undefined for zero");
+
+    let bits = q.bits() as usize;
+    if q & (q - BigUint::one()) == BigUint::zero() {
+        bits - 1
+    } else {
+        bits
+    }
+}
+
+/// Print a ring element
+pub fn print_ring_element(label: &str, ring_el: &[u64]) {
+    print!("{label} [");
+    for (k, &val) in ring_el.iter().enumerate() {
+        if k > 0 {
+            print!(", ");
+        }
+        print!("{val}");
+    }
+    println!("]");
+}
+
+/// Print a matrix of ring elements
+pub fn print_matrix_ring(label: &str, matrix: &[Vec<Vec<u64>>]) {
+    println!("\n{label}",);
+
+    for (i, row) in matrix.iter().enumerate() {
+        for (j, col) in row.iter().enumerate() {
+            print!("r{i}c{j}: ");
+            print_ring_element("", col);
+        }
+    }
+}
+
+/// Print a vector of ring elements
+pub fn print_vector_ring(label: &str, vec: &[Vec<u64>]) {
+    println!("\n{label}");
+    for (i, inner_vec) in vec.iter().enumerate() {
+        print!("{label}[{i}]: ");
+        print_ring_element("", inner_vec);
+    }
+}
+
+pub fn init_tracing() {
+    tracing_subscriber::fmt::init();
+}
+
+pub fn block_size() -> usize {
+    env::var("BLOCK_SIZE").map(|str| str.parse::<usize>().unwrap()).unwrap_or(100)
+}
+
+/// Calculate the total size of a directory in bytes
+pub fn calculate_directory_size<P: AsRef<Path>>(path: P) -> u64 {
+    WalkDir::new(path)
+        .follow_links(false)
+        .into_iter()
+        .par_bridge()
+        .filter_map(Result::ok)
+        .filter_map(|e| e.metadata().ok())
+        .filter(|m| m.is_file())
+        .map(|m| m.len())
+        .sum()
+}
+
+#[cfg(feature = "disk")]
+pub fn calculate_tmp_size() -> u64 {
+    calculate_directory_size(temp_dir())
+}
+</file>
+
+<file path="tests/test_io_dummy_param_width.rs">
+#[cfg(test)]
+mod test {
+    use diamond_io::test_utils::test_io_common;
+
+    #[tokio::test]
+    async fn test_io_just_mul_enc_and_and_bit_width() {
+        test_io_common(4, 2, 17, 10, "1", 3, 4, 2, 0.0, 0.0, "tests/io_dummy_param_width").await;
+    }
+}
+</file>
+
+<file path="tests/test_io_dummy_param.rs">
+#[cfg(test)]
+mod test {
+    use diamond_io::test_utils::test_io_common;
+
+    #[tokio::test]
+    #[ignore]
+    async fn test_io_just_mul_enc_and_and_bit() {
+        test_io_common(4, 2, 17, 10, "1", 3, 4, 1, 0.0, 0.0, "tests/io_dummy_param").await;
+    }
+}
+</file>
+
+<file path="tests/test_io_final_circuit.rs">
+use diamond_io::{io::utils::build_final_digits_circuit, utils::init_tracing};
+use keccak_asm::Keccak256;
+use mxx::{
+    bgg::{digits_to_int::DigitsToInt, public_key::BggPublicKey, sampler::BGGPublicKeySampler},
+    circuit::PolyCircuit,
+    lookup::lwe_eval::LweBggPubKeyEvaluator,
+    matrix::dcrt_poly::DCRTPolyMatrix,
+    poly::{
+        dcrt::{params::DCRTPolyParams, poly::DCRTPoly},
+        Poly, PolyParams,
+    },
+    rlwe_enc::rlwe_encrypt,
+    sampler::{
+        hash::DCRTPolyHashSampler, trapdoor::DCRTPolyTrapdoorSampler,
+        uniform::DCRTPolyUniformSampler, DistType, PolyHashSampler, PolyUniformSampler,
+    },
+    utils::log_mem,
+};
+use rand::Rng;
+use rayon::{iter::ParallelIterator, slice::ParallelSlice};
+
+#[test]
+#[ignore]
+fn test_build_final_step_circuit() {
+    init_tracing();
+    let params = DCRTPolyParams::default();
+    let log_base_q = params.modulus_digits();
+    let mut public_circuit = PolyCircuit::new();
+
+    // inputs: BaseDecompose(ct), eval_input
+    // outputs: BaseDecompose(ct) AND eval_input
+    {
+        let inputs = public_circuit.input((2 * log_base_q) + 1);
+        let mut outputs = vec![];
+        let eval_input = inputs[2 * log_base_q];
+        for ct_input in inputs[0..2 * log_base_q].iter() {
+            let muled = public_circuit.and_gate(*ct_input, eval_input);
+            outputs.push(muled);
+        }
+        public_circuit.output(outputs);
+    }
+
+    let mut rng = rand::rng();
+    let hash_key = rng.random::<[u8; 32]>();
+    let d = 1;
+    let sampler_uniform = DCRTPolyUniformSampler::new();
+    let hash_sampler = DCRTPolyHashSampler::<Keccak256>::new();
+    let hardcoded_key = sampler_uniform.sample_uniform(&params, 1, 1, DistType::BitDist);
+    log_mem("Sampled hardcoded_key_matrix");
+
+    let t_bar_matrix = sampler_uniform.sample_uniform(&params, 1, 1, DistType::FinRingDist);
+    log_mem("Sampled t_bar_matrix");
+
+    let a_rlwe_bar =
+        hash_sampler.sample_hash(&params, hash_key, "TEST_RLWE_A", 1, 1, DistType::FinRingDist);
+    let hardcoded_key_sigma = 40615715852990820734.97011;
+
+    let b = rlwe_encrypt(
+        &params,
+        &sampler_uniform,
+        &t_bar_matrix,
+        &a_rlwe_bar,
+        &hardcoded_key,
+        hardcoded_key_sigma,
+    );
+    log_mem("Generated RLWE ciphertext {a, b}");
+
+    let a_decomposed = a_rlwe_bar.entry(0, 0).decompose_base(&params);
+    let b_decomposed = b.entry(0, 0).decompose_base(&params);
+    log_mem("Decomposed RLWE ciphertext into {BaseDecompose(a), BaseDecompose(b)}");
+
+    let final_circuit = build_final_digits_circuit::<DCRTPoly, BggPublicKey<DCRTPolyMatrix>>(
+        &a_decomposed,
+        &b_decomposed,
+        public_circuit.clone(),
+    );
+    log_mem("Computed final_circuit");
+
+    let input_size = 1usize;
+    let dim = params.ring_dimension() as usize;
+    let log_base_q = params.modulus_digits();
+    let packed_input_size = input_size.div_ceil(dim) + 1;
+
+    let bgg_pubkey_sampler =
+        BGGPublicKeySampler::<_, DCRTPolyHashSampler<Keccak256>>::new(hash_key, d + 1);
+    // consider inserting t on plaintext
+    let reveal_plaintexts = [vec![true; packed_input_size], vec![false; 1]].concat();
+    let pubkeys = bgg_pubkey_sampler.sample(&params, b"BGG_PUBKEY_INPUT:", &reveal_plaintexts);
+    log_mem("Sampled pubkeys");
+
+    let eval_outputs = final_circuit.eval(
+        &params,
+        &pubkeys[0],
+        &pubkeys[1..],
+        None::<
+            LweBggPubKeyEvaluator<
+                DCRTPolyMatrix,
+                DCRTPolyHashSampler<Keccak256>,
+                DCRTPolyTrapdoorSampler,
+            >,
+        >,
+    );
+    log_mem("Evaluated outputs");
+
+    let output_ints = eval_outputs
+        .par_chunks(log_base_q)
+        .map(|bits| BggPublicKey::digits_to_int(bits, &params))
+        .collect::<Vec<_>>();
+    log_mem("Converted outputs to integers");
+    let _ = output_ints[0].concat_matrix(&output_ints[1..]);
+    log_mem("Concatenated outputs into matrix");
+}
+</file>
+
+<file path="tests/test_io_middle_param.rs">
+#[cfg(test)]
+mod test {
+    use diamond_io::test_utils::test_io_common;
+
+    #[tokio::test]
+    async fn test_io_just_mul_enc_and_bit_middle_params() {
+        test_io_common(
+            4096,
+            6,
+            51,
+            17,
+            "323778148704285877904461387615990672855113714166872436505644678160965660026126816597",
+            1,
+            1,
+            1,
+            12.057,
+            542800000000000000000000000.0,
+            "tests/io_middle_param",
+        )
+        .await;
+    }
+}
+</file>
+
+<file path="tests/test_io_plt.rs">
+#[cfg(test)]
+mod test {
+    use diamond_io::test_utils::test_io_plt;
+
+    #[tokio::test]
+    async fn test_io_plt_dummy() {
+        test_io_plt(4, 2, 17, 10, "1", 3, 3, 1, 0.0, 0.0, "tests/io_plt").await;
+    }
+}
+</file>
+
+<file path="tests/test_io_real_param.rs">
+#[cfg(test)]
+mod test {
+    use diamond_io::test_utils::test_io_common;
+
+    #[tokio::test]
+    #[ignore]
+    async fn test_io_just_mul_enc_and_bit_real_params() {
+        test_io_common(
+            8192,
+            7,
+            51,
+            17,
+            "182270893731917660364375185298660602983033397643884786244994464562915433787344833915025064536484522",
+            1,
+            1,
+            1,
+            12.919,
+            108910000000000000000000000000000000.0,
+            "tests/io_real_param",
+        )
+        .await;
+    }
+}
+</file>
+
+<file path=".gitignore">
+# Generated by Cargo
+# will have compiled files and executables
+debug/
+target/
+
+# Remove Cargo.lock from gitignore if creating an executable, leave it for libraries
+# More information here https://doc.rust-lang.org/cargo/guide/cargo-toml-vs-cargo-lock.html
+Cargo.lock
+
+# These are backup files generated by rustfmt
+**/*.rs.bk
+
+# MSVC Windows builds of rustc generate these, which store debugging information
+*.pdb
+
+# RustRover
+#  JetBrains specific template is maintained in a separate JetBrains.gitignore that can
+#  be found at https://github.com/github/gitignore/blob/main/Global/JetBrains.gitignore
+#  and can be added to the global gitignore or merged into this file.  For a more nuclear
+#  option (not recommended) you can uncomment the following to ignore the entire idea folder.
+#.idea/
+
+final_bits_norm.json
+venv
+.venv
+/logs
+/data
+/bgm
+
+.DS_Store
+
+/test_encoding_write_read
+/test_pubkey_write_read
+/test_matrix_write_read
+/tests/io_dummy_param_width
+/tests/io_dummy_param
+/tests/io_middle_param
+/tests/io_real_param
+
+hash_key
+*.matrix
+*.poly
+
+/simulator/*.json
+</file>
+
+<file path=".gitmodules">
+[submodule "simulator/estimator"]
+	path = simulator/estimator
+	url = https://github.com/malb/lattice-estimator.git
+</file>
+
+<file path=".python-version">
+3.10
+</file>
+
+<file path="build.rs">
+fn main() {
+    println!("cargo::rerun-if-changed=src/main.rs");
+
+    // linking openFHE
+    println!("cargo::rustc-link-arg=-L/usr/local/lib");
+    println!("cargo::rustc-link-arg=-lOPENFHEpke");
+    println!("cargo::rustc-link-arg=-lOPENFHEbinfhe");
+    println!("cargo::rustc-link-arg=-lOPENFHEcore");
+
+    // linking OpenMP
+    println!("cargo::rustc-link-arg=-fopenmp");
+
+    // necessary to avoid LD_LIBRARY_PATH
+    println!("cargo::rustc-link-arg=-Wl,-rpath,/usr/local/lib");
+
+    // Only execute the following code when the "bgm" feature is enabled
+    #[cfg(feature = "bgm")]
+    {
+        use std::{fs, path::Path};
+        // Create bgm directory if it doesn't exist
+        let bgm_dir = Path::new("bgm");
+        if !bgm_dir.exists() {
+            println!("Creating bgm directory");
+            fs::create_dir(bgm_dir).expect("Failed to create bgm directory");
+        }
+
+        // Download bgm/obf_bgm1.mp3 if it doesn't exist
+        let bgm_files = vec![
+            ("obf_bgm1.mp3", "https://bgmer.net/wp-content/uploads/2022/03/233_BPM163.mp3"),
+            ("obf_bgm2.mp3", "https://bgmer.net/wp-content/uploads/2024/02/420_BPM108.mp3"),
+            ("obf_bgm3.mp3", "https://bgmer.net/wp-content/uploads/2021/12/251_BPM150.mp3"),
+            ("obf_bgm4.mp3", "https://bgmer.net/wp-content/uploads/2021/09/157_BPM175.mp3"),
+            ("obf_bgm5.mp3", "https://bgmer.net/wp-content/uploads/2021/05/075_BPM140.mp3"),
+            (
+                "eval_bgm1.mp3",
+                "https://www.dropbox.com/scl/fi/a29p739qel80nfdgj3r8d/04BNE.mp3?rlkey=orn1jrcpdy2ggd845invaykez&st=6hpk0lyb&dl=1",
+            ),
+            (
+                "eval_bgm2.mp3",
+                "https://www.dropbox.com/scl/fi/z07sk9829bjvs78g1ddgk/01VD.mp3?rlkey=z7ywvv1suvwsa947osg2zwnlg&st=pl2d79f4&dl=1",
+            ),
+        ];
+
+        for (file_name, url) in bgm_files {
+            let bgm_file = bgm_dir.join(file_name);
+            if !bgm_file.exists() {
+                println!("Downloading {file_name}");
+                let response = reqwest::blocking::get(url).expect("Failed to download file");
+                let content = response.bytes().expect("Failed to read response");
+                fs::write(bgm_file, content).expect("Failed to write file");
+                println!("Downloaded {file_name}");
+            }
+        }
+    }
+}
+</file>
+
+<file path="Cargo.toml">
+[workspace]
+resolver = "2"
+members = [".", "dio"]
+
+[package]
+name = "diamond-io"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.83"
+license = "MIT OR Apache-2.0"
+
+[features]
+default = ["debug"]
+debug = []
+bgm = ["rodio", "reqwest"]
+disk = ["libc", "memmap2", "tempfile"]
+cpu = []
+
+[dependencies]
+mxx = { git = "https://github.com/MachinaIO/mxx.git" }
+tokio = { version = "1", features = ["fs", "rt-multi-thread", "macros"] }
+libc = { version = "0.2", optional = true }
+num-bigint = { version = "0.4", features = ["serde"] }
+num-traits = "0.2"
+rayon = { version = "1.5" }
+rand = { version = "0.9.0", features = ["std_rng"] }
+itertools = "0.14.0"
+tracing = "0.1"
+tracing-subscriber = "0.3"
+bitvec = "1"
+memory-stats = "1.2.0"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+rodio = { git = "https://github.com/RustAudio/rodio.git", optional = true }
+tempfile = { version = "3.19.1", optional = true }
+memmap2 = { version = "0.9.5", optional = true }
+once_cell = "1.21.1"
+dashmap = "6.1.0"
+keccak-asm = { version = "0.1.4" }
+walkdir = "2"
+bincode = "2.0.1"
+
+[dev-dependencies]
+proptest = "1.0.0"
+criterion = "0.6.0"
+serial_test = "3.2.0"
+
+[build-dependencies]
+reqwest = { version = "0.12", features = ["blocking"], optional = true }
+
+[profile.dev]
+debug = "line-tables-only"
+split-debuginfo = "unpacked"
+
+[profile.release]
+opt-level = 3
+lto = "thin"
+debug = "none"
+strip = "symbols"
+panic = "abort"
+codegen-units = 16
+
+# Use the `--profile profiling` flag to show symbols in release mode.
+# e.g. `cargo build --profile profiling`
+[profile.profiling]
+inherits = "release"
+debug = "full"
+strip = "none"
+</file>
+
+<file path="cloud-init.sh">
+#!/bin/sh
+
+set -eux
+trap 'poweroff' TERM EXIT INT
+
+GH_REPO="__GH_REPO__"
+GH_PAT="__GH_PAT__"
+RUNNER_TAG="__RUNNER_TAG__"
+
+# idle poweroff script
+cat >> /etc/crontab << 'EOF'
+*/1 * * * * root cat /proc/uptime | awk -F ' ' '{ if ($1 < 300) exit 1 }' && (cat /proc/loadavg | awk -F ' ' '{ if ($1 <= .3 && $2 < .3 && $3 < .3) exit 1 }' || poweroff)
+EOF
+GH_RUNNER_TOKEN=$(curl -s -X POST -H "Authorization: Bearer ${GH_PAT}" -H "Accept: application/vnd.github.v3+json" https://api.github.com/repos/${GH_REPO}/actions/runners/registration-token | jq -r '.token')
+
+# basics
+apt-get update
+apt-get install -y curl jq git ca-certificates gnupg lsb-release
+
+# github runner
+mkdir actions-runner && cd actions-runner
+LATEST_VERSION_LABEL=$(curl -H "authorization: token ${GH_PAT}" -s -X GET 'https://api.github.com/repos/actions/runner/releases/latest' | jq -r '.tag_name')
+LATEST_VERSION=$(printf -- ${LATEST_VERSION_LABEL} | cut -c 2-)
+RUNNER_FILE="actions-runner-linux-x64-${LATEST_VERSION}.tar.gz"
+curl -o $RUNNER_FILE -L https://github.com/actions/runner/releases/download/$LATEST_VERSION_LABEL/$RUNNER_FILE
+tar xzf ./$RUNNER_FILE
+
+cd /
+chown -R ubuntu actions-runner
+cd actions-runner
+sudo -u ubuntu ./config.sh --url https://github.com/${GH_REPO} --token ${GH_RUNNER_TOKEN} --labels ${RUNNER_TAG} --ephemeral --unattended --disableupdate --replace
+sudo -u ubuntu ./run.sh
+</file>
+
+<file path="justfile">
+# Set environment variable
+export CARGO_MAKE_EXTEND_WORKSPACE_MAKEFILE := "true"
+
+# Run rustfmt to check the code formatting without making changes
+format:
+    cargo +nightly fmt -- --check
+
+# Clean up the project by removing the target directory
+clean:
+    cargo clean
+
+# Run clippy to catch common mistakes and improve your Rust code
+clippy:
+    RUSTFLAGS="-A unused" cargo +nightly clippy --all-targets --all-features -- -Dwarnings
+
+# Generate documentation for the project
+docs:
+    cargo doc --no-deps
+
+# Execute all unit tests in the workspace
+test:
+   cargo test -r
+
+test-io:
+   cargo test -r --test test_io_dummy_param --no-default-features
+
+e2e:
+    dio run-bench -c e2e/dio-config.0.toml -o e2e/param_0 --add-num 1 --mul-num 1
+    dio run-bench -c e2e/dio-config.1.toml -o e2e/param_1 --add-num 1 --mul-num 1
+    dio run-bench -c e2e/dio-config.2.toml -o e2e/param_2 --add-num 1 --mul-num 1
+    dio run-bench -c e2e/dio-config.3.toml -o e2e/param_3 --add-num 1 --mul-num 1
+    dio run-bench -c e2e/dio-config.4.toml -o e2e/param_4 --add-num 1 --mul-num 1
+    dio run-bench -c e2e/dio-config.5.toml -o e2e/param_5 --add-num 1 --mul-num 1
+    dio run-bench -c e2e/dio-config.6.toml -o e2e/param_6 --add-num 1 --mul-num 1
+    dio run-bench -c e2e/dio-config.dummy.toml -o e2e/dummy_1_2 --add-num 1 --mul-num 2
+    dio run-bench -c e2e/dio-config.dummy.toml -o e2e/dummy_1_3 --add-num 1 --mul-num 3
+    dio run-bench -c e2e/dio-config.dummy.toml -o e2e/dummy_2_1 --add-num 2 --mul-num 1
+    dio run-bench -c e2e/dio-config.dummy.toml -o e2e/dummy_3_1 --add-num 3 --mul-num 1
+    dio run-bench -c e2e/dio-config.dummy.toml -o e2e/dummy_4_1 --add-num 4 --mul-num 1
+    dio run-bench -c e2e/dio-config.dummy.toml -o e2e/dummy_5_1 --add-num 5 --mul-num 1
+   
+# Run the entire CI pipeline including format, clippy, docs, and test checks
+ci: format clippy docs test test-io
+    @echo "CI flow completed"
+</file>
+
+<file path="LICENSE">
+MIT License
+
+Copyright (c) 2024 MachinaIO
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+</file>
+
+<file path="memory_profile.py">
+#!/usr/bin/env python3
+"""
+Memory Usage Analyzer for Diamond-IO Logs
+
+This script runs a cargo test command, captures the logs, and provides insights
+about the most memory-intensive steps in the circuit obfuscation process.
+"""
+
+import re
+import pandas as pd
+from datetime import datetime
+from pathlib import Path
+import subprocess
+import sys
+import argparse
+
+
+def run_cargo_test(command):
+    """Run a command and capture the output, ensuring logs are saved even if interrupted."""
+    print(f"Running command: {' '.join(command)}")
+    process = subprocess.Popen(
+        command,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+        bufsize=1,
+        universal_newlines=True
+    )
+    
+    # Capture output line by line
+    all_output = []
+    try:
+        for line in iter(process.stdout.readline, ''):
+            print(line, end='')  # Print in real-time
+            all_output.append(line)
+            
+            # Stop when we see the completion message
+            if "OBFUSCATION COMPLETED" in line:
+                print("Obfuscation completed, stopping log capture.")
+                break
+    except KeyboardInterrupt:
+        print("\nProcess interrupted! Saving captured logs...\n")
+    finally:
+        # Ensure process is terminated properly
+        process.stdout.close()
+        process.terminate()
+        process.wait()
+
+    return ''.join(all_output)
+
+
+
+def strip_ansi_codes(text):
+    """Remove ANSI color codes from text."""
+    ansi_escape = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
+    return ansi_escape.sub('', text)
+
+
+def analyze_memory_usage_from_string(log_output):
+    """
+    Parses memory usage logs and returns a DataFrame.
+    Skips invalid entries instead of crashing.
+    """
+    # First strip all ANSI codes from the output
+    log_output = strip_ansi_codes(log_output)
+    
+    # Pattern for lines with message
+    pattern_with_message = re.compile(
+        r".*?diamond_io::utils\s*:\s*(.*?)\s*\|\|\s*Current physical/virtual memory usage:\s*(\d+)\s*\|\s*(\d+)"
+    )
+    
+    # Pattern for lines with just numbers
+    pattern_numbers = re.compile(
+        r"(\d+)\s*\|\s*(\d+)"
+    )
+
+    data = []
+    
+    for line in log_output.splitlines():
+        # Try to match line with message first
+        match = pattern_with_message.search(line)
+        if match:
+            try:
+                message = match.group(1).strip()
+                physical_memory = int(match.group(2))
+                virtual_memory = int(match.group(3))
+                data.append({
+                    'message': message,
+                    'physical_memory': physical_memory,
+                    'virtual_memory': virtual_memory
+                })
+            except ValueError as e:
+                print(f"Skipping invalid log entry: {line} (Error: {e})")
+        else:
+            # Try to match line with just numbers
+            match = pattern_numbers.search(line)
+            if match:
+                try:
+                    physical_memory = int(match.group(1))
+                    virtual_memory = int(match.group(2))
+                    # Use a generic message for number-only lines
+                    data.append({
+                        'message': f"Memory measurement {len(data) + 1}",
+                        'physical_memory': physical_memory,
+                        'virtual_memory': virtual_memory
+                    })
+                except ValueError as e:
+                    print(f"Skipping invalid log entry: {line} (Error: {e})")
+    
+    if not data:
+        return None  # No valid logs
+
+    df = pd.DataFrame(data)
+    
+    # Calculate changes and percentages
+    df['physical_memory_change'] = df['physical_memory'].diff().fillna(0)
+    df['virtual_memory_change'] = df['virtual_memory'].diff().fillna(0)
+    
+    # Calculate percentage changes
+    df['physical_percentage_increase'] = (df['physical_memory_change'] / df['physical_memory'].shift(1) * 100).fillna(0)
+    df['virtual_percentage_increase'] = (df['virtual_memory_change'] / df['virtual_memory'].shift(1) * 100).fillna(0)
+    
+    return df
+
+
+def format_bytes(bytes_value):
+    """Format bytes to human-readable format."""
+    if bytes_value < 1024:
+        return f"{bytes_value} B"
+    elif bytes_value < 1024 ** 2:
+        return f"{bytes_value / 1024:.2f} KB"
+    elif bytes_value < 1024 ** 3:
+        return f"{bytes_value / (1024 ** 2):.2f} MB"
+    else:
+        return f"{bytes_value / (1024 ** 3):.2f} GB"
+
+
+def generate_physical_memory_table(df):
+    """Generate a table for physical memory usage."""
+    table = "===== PHYSICAL MEMORY USAGE =====\n\n"
+    table += f"{'Step Description':<70} {'Memory Usage':<15} {'Absolute Change':<20} {'% Change':<15}\n"
+    table += "-" * 120 + "\n"
+    
+    for _, row in df.iterrows():
+        table += f"{row['message']:<70} {format_bytes(row['physical_memory']):<15} "
+        table += f"{format_bytes(row['physical_memory_change']):<20} "
+        
+        if row['physical_memory_change'] != 0:
+            table += f"{row['physical_percentage_increase']:.2f}%\n"
+        else:
+            table += "0.00%\n"
+    
+    # Add summary statistics
+    initial_physical = df['physical_memory'].iloc[0]
+    final_physical = df['physical_memory'].iloc[-1]
+    max_physical = df['physical_memory'].max()
+    
+    table += "\n===== SUMMARY =====\n"
+    table += f"Initial physical memory: {format_bytes(initial_physical)}\n"
+    table += f"Final physical memory: {format_bytes(final_physical)}\n"
+    table += f"Peak physical memory: {format_bytes(max_physical)}\n"
+    table += f"Total physical memory increase: {format_bytes(final_physical - initial_physical)}\n"
+    
+    return table
+
+
+def generate_virtual_memory_table(df):
+    """Generate a table for virtual memory usage."""
+    table = "===== VIRTUAL MEMORY USAGE =====\n\n"
+    table += f"{'Step Description':<70} {'Memory Usage':<15} {'Absolute Change':<20} {'% Change':<15}\n"
+    table += "-" * 120 + "\n"
+    
+    for _, row in df.iterrows():
+        table += f"{row['message']:<70} {format_bytes(row['virtual_memory']):<15} "
+        table += f"{format_bytes(row['virtual_memory_change']):<20} "
+        
+        if row['virtual_memory_change'] != 0:
+            table += f"{row['virtual_percentage_increase']:.2f}%\n"
+        else:
+            table += "0.00%\n"
+    
+    # Add summary statistics
+    initial_virtual = df['virtual_memory'].iloc[0]
+    final_virtual = df['virtual_memory'].iloc[-1]
+    max_virtual = df['virtual_memory'].max()
+    
+    table += "\n===== SUMMARY =====\n"
+    table += f"Initial virtual memory: {format_bytes(initial_virtual)}\n"
+    table += f"Final virtual memory: {format_bytes(final_virtual)}\n"
+    table += f"Peak virtual memory: {format_bytes(max_virtual)}\n"
+    table += f"Total virtual memory increase: {format_bytes(final_virtual - initial_virtual)}\n"
+    
+    return table
+
+
+def generate_combined_memory_table(df):
+    """Generate a table for combined physical and virtual memory usage."""
+    table = "===== COMBINED MEMORY USAGE =====\n\n"
+    table += f"{'Step Description':<70} {'Physical Memory':<15} {'Virtual Memory':<15} {'Physical Change':<15} {'% Change':<10} {'Virtual Change':<15} {'% Change':<10}\n"
+    table += "-" * 150 + "\n"
+    
+    for _, row in df.iterrows():
+        table += f"{row['message']:<70} "
+        table += f"{format_bytes(row['physical_memory']):<15} "
+        table += f"{format_bytes(row['virtual_memory']):<15} "
+        table += f"{format_bytes(row['physical_memory_change']):<15} "
+        
+        # Add physical memory percentage change
+        if row['physical_memory_change'] != 0:
+            table += f"{row['physical_percentage_increase']:.2f}%{'':<5} "
+        else:
+            table += f"0.00%{'':<5} "
+        
+        # Add virtual memory change and percentage
+        table += f"{format_bytes(row['virtual_memory_change']):<15} "
+        
+        if row['virtual_memory_change'] != 0:
+            table += f"{row['virtual_percentage_increase']:.2f}%\n"
+        else:
+            table += f"0.00%\n"
+    
+    # Add summary statistics
+    initial_physical = df['physical_memory'].iloc[0]
+    final_physical = df['physical_memory'].iloc[-1]
+    max_physical = df['physical_memory'].max()
+    
+    initial_virtual = df['virtual_memory'].iloc[0]
+    final_virtual = df['virtual_memory'].iloc[-1]
+    max_virtual = df['virtual_memory'].max()
+    
+    table += "\n===== SUMMARY =====\n"
+    table += f"Initial memory (physical/virtual): {format_bytes(initial_physical)} / {format_bytes(initial_virtual)}\n"
+    table += f"Final memory (physical/virtual): {format_bytes(final_physical)} / {format_bytes(final_virtual)}\n"
+    table += f"Peak memory (physical/virtual): {format_bytes(max_physical)} / {format_bytes(max_virtual)}\n"
+    table += f"Total increase (physical/virtual): {format_bytes(final_physical - initial_physical)} / {format_bytes(final_virtual - initial_virtual)}\n"
+    
+    return table
+
+def analyze_log_file(log_file_path):
+    """Analyze memory usage from an existing log file."""
+    try:
+        with open(log_file_path, 'r') as f:
+            log_content = f.read()
+        return analyze_memory_usage_from_string(log_content)
+    except Exception as e:
+        print(f"Error reading or analyzing log file: {e}")
+        return None
+
+def save_analysis_files(df, logs_dir, timestamp):
+    """Save analysis files if we have valid data."""
+    if df is None or df.empty:
+        print("No valid log entries found. Skipping file save.")
+        return False
+
+    physical_table = generate_physical_memory_table(df)
+    virtual_table = generate_virtual_memory_table(df)
+    combined_table = generate_combined_memory_table(df)
+    
+    print("\n" + combined_table)
+    
+    physical_table_path = logs_dir / f"physical_memory_analysis_{timestamp}.txt"
+    virtual_table_path = logs_dir / f"virtual_memory_analysis_{timestamp}.txt"
+    combined_table_path = logs_dir / f"combined_memory_analysis_{timestamp}.txt"
+    
+    with open(physical_table_path, 'w') as f:
+        f.write(physical_table)
+    with open(virtual_table_path, 'w') as f:
+        f.write(virtual_table)
+    with open(combined_table_path, 'w') as f:
+        f.write(combined_table)
+
+    print(f"Physical memory analysis saved to {physical_table_path}")
+    print(f"Virtual memory analysis saved to {virtual_table_path}")
+    print(f"Combined memory analysis saved to {combined_table_path}")
+    return True
+
+def main():
+    """Run the memory profiler with the specified command or analyze an existing log file."""
+    parser = argparse.ArgumentParser(description='Memory Usage Analyzer for Diamond-IO Logs')
+    parser.add_argument('--log-file', help='Path to an existing log file to analyze')
+    parser.add_argument('command', nargs=argparse.REMAINDER, help='Command to run (if not using --log-file)')
+    args = parser.parse_args()
+
+    logs_dir = Path("logs")
+    logs_dir.mkdir(exist_ok=True)
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+
+    if args.log_file:
+        # Analyze existing log file
+        df = analyze_log_file(args.log_file)
+        if df is not None and not df.empty:
+            save_analysis_files(df, logs_dir, timestamp)
+        return
+
+    if not args.command:
+        print("Error: No command specified.")
+        print("Usage: python memory_profiler.py <command> [args...]")
+        print("       python memory_profiler.py --log-file <path>")
+        sys.exit(1)
+
+    print("Running memory profiler...")
+    log_output = ""
+    df = None
+
+    try:
+        log_output = run_cargo_test(args.command)
+        df = analyze_memory_usage_from_string(log_output)
+    except KeyboardInterrupt:
+        print("\nProcess interrupted! Checking logs before saving...\n")
+        if log_output:  # Only analyze if we have some output
+            df = analyze_memory_usage_from_string(log_output)
+    except Exception as e:
+        print(f"Error during execution: {e}")
+        if log_output:  # Try to analyze any output we got
+            df = analyze_memory_usage_from_string(log_output)
+
+    if df is not None and not df.empty:
+        # Save raw logs only if we have valid data
+        log_file_path = logs_dir / f"test_logs_{timestamp}.txt"
+        with open(log_file_path, 'w') as f:
+            f.write(log_output)
+        print(f"Raw logs saved to {log_file_path}")
+        
+        # Save analysis files
+        save_analysis_files(df, logs_dir, timestamp)
+    else:
+        print("No valid log entries found. No files will be written.")
+
+if __name__ == "__main__":
+    main()
+</file>
+
+<file path="monitor_cpu.sh">
+#!/bin/bash
+LOGFILE="./cpu_usage.log"
+
+while true; do
+    echo "==== $(date) ====" >> "${LOGFILE}"
+    mpstat -P ALL 1 1 >> "${LOGFILE}"
+    sleep 10
+done
+</file>
+
+<file path="pyproject.toml">
+[project]
+name = "memory-profile"
+version = "0.1.0"
+description = "Format memory profiling with script"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "pandas>=2.2.3",
+]
+</file>
+
+<file path="README.md">
+# diamond-io
+
+Implementation of [Diamond iO](https://eprint.iacr.org/2025/236), a straightforward construction of indistinguishability obfuscation (iO).
+
+## Installation
+
+### Prerequisites
+- [Rust](https://www.rust-lang.org/tools/install) 1.87 nightly
+- [OpenFHE](https://openfhe-development.readthedocs.io/en/latest/sphinx_rsts/intro/installation/installation.html) (System install required in `/usr/local/lib`), make sure to install our [fork](https://github.com/MachinaIO/openfhe-development/tree/feat/improve_determinant) in `/feat/improve_determinant` branch
+
+## Experiments
+
+You can run evaluation experiments with [e2e](./e2e/) parameters with [dio](./dio/) cli tooling.
+
+### Building
+
+After installing the prerequisites, you can build the project using:
+
+```bash
+cargo build --release
+```
+
+## Test iO (End-To-End)
+
+- **Dummy parameters**  
+Fastest way to check if the end-to-end process works with insecure parameters:
+```bash
+cargo test -r --test test_io_dummy_param --no-default-features -- --nocapture
+```
+
+- **Real parameters** 
+Warning: You need sufficient RAM.
+```bash
+cargo test -r --test test_io_real_param --no-default-features -- --ignored --nocapture
+```
+
+- **With memory profiler**  
+```bash
+uv run memory_profile.py cargo test -r --test test_io_dummy_param --no-default-features
+```
+
+## Note
+
+We currently support two different matrix implementations:
+1. **In-memory** (default): Uses memory for all matrix storage.
+2. **Disk-backed** (enable with `--features disk`): Uses the `mmap()` syscall to store matrices on disk.
+
+
+## Simulate Parameters
+
+Our simulator only targets circuits used for our benchmarks.
+
+1. Make sure to install [`dio`](/dio/) binary before
+2. Change the following values hardcoded in `simulator/main.py` after the line `if __name__ == "__main__":`:
+    - `secpar`: the minimum security parameter you want to guarantee.
+    - `log2_n`: a log2 value of the ring dimension.
+    - `max_d`: the maximum value of the number of the secret polynomials denoted by `d`.
+    - `min_base_bits`: the minimum value of the base bits for decomposition denoted by `base_bits`.
+    - `max_base_bits`: the maximum value of `base_bits`.
+    - `crt_bits`: the bits of each moduli of CRT.
+    - `max_crt_depth`: the maximum number of moduli.
+    - `input_size`: the evaluator's input bit size.
+    - `input_width`: the number of bits inserted at each diamond. The larger value of `input_width` increase the number of preimages but decrease the required modulus size.
+    - `add_num`: the number of addition gates for the evaluator's input bits.
+    - `mul_num`: the number of multiplication gates for the evaluator's input bits.
+3. Install sagemath if you have not installed it. Ref: https://doc.sagemath.org/html/en/installation/conda.html
+4. Run `sage main.py` under the `simulator` directory.
+
+If the script is completed without any error, the found parameters are added to the last line in `simulator/params.log`. 
+Among the parameters, `crt_depth` denotes the minimum number of moduli satisfying correctness and security, and `d`, `hardcoded_key_sigma`, `p_sigma`, and `switched_modulus` can be used for `ObfuscationParams`.
+
+
+## Acknowledgments
+
+*We would like to sincerely thank the developers of [OpenFHE](https://github.com/openfheorg/openfhe-development) and [openfhe-rs](https://github.com/fairmath/openfhe-rs), open-source lattice and FHE libraries, whose optimized implementations of trapdoor sampling, RLWE primitives, and Rust bindings played a crucial role in helping us implement Diamond iO. We are also grateful to Prof. Yuriy Polyakov for his valuable advice on preimage sampling and his insightful feedback on optimizing our implementation. We greatefully acknowledge [Community Privacy Residency (2025)](https://community-privacy.github.io/partners/), in which our earliest implementation was developed. Any remaining errors are entirely our own responsibility.*
+</file>
+
+<file path="run.sh">
+#!/bin/sh
+
+set -eux
+
+EXIT_CODE=0
+RUNNER_TAG=$1
+
+VPC_ID="vpc-085ffb1026b00654e"
+SUBNET_IDS=$(aws ec2 describe-subnets --filters "Name=vpc-id,Values=${VPC_ID}" "Name=tag:Type,Values=private" --query "Subnets[].SubnetId" --output json | jq -r '.[]')
+
+
+cat cloud-init.sh | sed -e "s#__GH_REPO__#${GH_REPO}#" -e "s/__GH_PAT__/${GH_PAT}/" -e "s/__RUNNER_TAG__/${RUNNER_TAG}/" > .startup.sh
+
+for SUBNET in $SUBNET_IDS; do
+  INSTANCE_ID=$(aws ec2 run-instances \
+    --image-id ${IMAGE_ID} \
+    --block-device-mapping "[ { \"DeviceName\": \"/dev/sda1\", \"Ebs\": { \"VolumeSize\": 100, \"DeleteOnTermination\": true } } ]" \
+    --ebs-optimized \
+    --instance-initiated-shutdown-behavior terminate \
+    --instance-type ${INSTANCE_TYPE} \
+    --key-name devopsoregon \
+    --security-group-ids ${SG} \
+    --subnet-id ${SUBNET} \
+    --tag-specifications "ResourceType=instance,Tags=[{Key=Name,Value=machina-io-ephemeral-${RUNNER_TAG}},{Key=ProjectName,Value=machina-io}]" "ResourceType=volume,Tags=[{Key=ProjectName,Value=machina-io}]" \
+    --user-data "file://.startup.sh" \
+    --query "Instances[0].InstanceId" \
+    --output text 2>&1 || true)
+    if echo "$INSTANCE_ID" | grep -q '^i-[0-9a-f]\{17\}$'; then
+      echo "INSTANCE_ID=$INSTANCE_ID" >> "$GITHUB_ENV"
+      aws ec2 wait instance-running --instance-ids "$INSTANCE_ID"
+      echo "EC2 instance $INSTANCE_ID is running in subnet $SUBNET"
+      exit 0  # EXIT_CODE=0
+    elif echo "$INSTANCE_ID" | grep -q "InsufficientInstanceCapacity"; then
+      echo "Warning: Insufficient capacity for $INSTANCE_TYPE in subnet $SUBNET"
+      EXIT_CODE=1
+      continue
+    else
+      echo "Error: Failed to launch EC2 instance with subnet $SUBNET: $INSTANCE_ID"
+      exit 1
+    fi
+done
+
+echo -e "Error: No subnets in \n$SUBNET_IDS \nhad sufficient capacity for $INSTANCE_TYPE."
+exit $EXIT_CODE
+</file>
+
+<file path="rustfmt.toml">
+reorder_imports = true
+imports_granularity = "Crate"
+use_small_heuristics = "Max"
+comment_width = 100
+wrap_comments = true
+binop_separator = "Back"
+trailing_comma = "Vertical"
+trailing_semicolon = false
+use_field_init_shorthand = true
+format_code_in_doc_comments = true
+doc_comment_code_block_width = 100
+</file>
+
+</files>

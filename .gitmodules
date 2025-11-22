@@ -1,0 +1,3 @@
+[submodule "diamond-io"]
+	path = diamond-io
+	url = https://github.com/MachinaIO/diamond-io.git
