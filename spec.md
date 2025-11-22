@@ -1,416 +1,735 @@
-# Diamond IO Coprocessor - Hackathon Spec
+# IO Coprocessor Specification
+## A Decentralized Indistinguishability Obfuscation Coprocessor for Smart Contracts
 
-## Abstract
-Build a coprocessor that brings Indistinguishability Obfuscation (iO) to Ethereum smart contracts, enabling developers to obfuscate arbitrary computation logic on-chain. Similar to FHE coprocessors, this system offloads heavy iO operations off-chain while maintaining cryptographic guarantees on-chain.
+**Version**: 1.0  
+**Target**: Hackathon Implementation  
+**Status**: Specification Draft
 
-**Repository**: [MachinaIO/diamond-io](https://github.com/MachinaIO/diamond-io)  
-**Hackathon Goal**: MVP enabling Solidity developers to deploy obfuscated logic contracts with minimal friction.
+---
+
+## Executive Summary
+
+The IO Coprocessor enables Solidity smart contracts to leverage Indistinguishability Obfuscation (iO) through a decentralized network of compute nodes. It combines Diamond iO (cryptographic primitives), Symbiotic (shared security & attestation), Fluence (decentralized compute execution), and Filecoin Onchain Cloud (verifiable storage) to create a permissionless, trustless obfuscation service that transforms arbitrary programs into cryptographically protected black boxes while maintaining on-chain verifiability.
 
 ---
 
 ## 1. Architecture Overview
 
+### 1.1 High-Level Flow
+
 ```
-┌─────────────────────────────────────────────────────────────────────┐
-│                          EVM Chain (L1/L2)                           │
-│  ┌───────────────────────────────────────────────────────────────┐  │
-│  │  DiamondIORegistry (Singleton)                               │  │
-│  │  - Stores obfuscated program hashes                          │  │
-│  │  - Handles input/output commitments                          │  │
-│  │  - Verifies coprocessor attestations                         │  │
-│  └───────────────────────────────────────────────────────────────┘  │
-│         │                  │                  │                      │
-│         │ Events           │ Callbacks        │ Proofs               │
-│         │                  │                  │                      │
-└─────────┼──────────────────┼──────────────────┼──────────────────────┘
-          │                  │                  │
-┌─────────▼──────────────────▼──────────────────▼──────────────────────┐
-│                 Off-Chain Coprocessor Network                        │
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐              │
-│  │  DioNode     │  │  DioNode     │  │  DioNode     │              │
-│  │  (Rust)      │  │  (Rust)      │  │  (Rust)      │              │
-│  │              │  │              │  │              │              │
-│  │  - Event     │  │  - Event     │  │  - Event     │              │
-│  │    Listener  │  │    Listener  │  │    Listener  │              │
-│  │  - iO Engine │  │  - iO Engine │  │  - iO Engine │              │
-│  │  - Prover    │  │  - Prover    │  │  - Prover    │              │
-│  └──────────────┘  └──────────────┘  └──────────────┘              │
-│              │            │                │                        │
-│              └────────────┴────────────────┘                        │
-│                           │                                           │
-│                    ┌──────▼──────┐                                    │
-│                    │  DiamondIO  │                                    │
-│                    │  Library    │                                    │
-│                    │  (diamond-io│                                    │
-│                    │   Rust crate)│                                   │
-│                    └─────────────┘                                    │
-└───────────────────────────────────────────────────────────────────────┘
+┌─────────────────┐        ┌──────────────────┐        ┌──────────────────┐
+│  Solidity       │        │  Symbiotic       │        │  Fluence         │
+│  Smart Contract │───────▶│  (Events &       │───────▶│  Compute Network │
+│                 │  Req   │  Attestation)    │  Task  │                  │
+└─────────────────┘        └──────────────────┘        └──────────────────┘
+        │                                                            │
+        │                                                            ▼
+        │                                              ┌──────────────────┐
+        │                                              │  Diamond iO      │
+        │                                              │  Obfuscation     │
+        │                                              │  Engine          │
+        │                                              └──────────────────┘
+        │                                                            │
+        ▼                                                            │
+┌─────────────────┐        ┌──────────────────┐                      │
+│  Filecoin       │◀───────┤  Ciphertext      │◀─────────────────────┘
+│  Onchain Cloud  │  Store │  Program Result  │  Result
+│  (IPFS)         │        │                  │
+└─────────────────┘        └──────────────────┘
 ```
+
+### 1.2 Core Components
+
+| Component | Role | Technology | Network |
+|-----------|------|------------|---------|
+| **Request Portal** | On-chain interface for submitting obfuscation jobs | Solidity Smart Contract | Ethereum L2 (Base/Arbitrum) |
+| **Security Layer** | Event emission, operator attestation, slashing | Symbiotic Protocol | Ethereum Mainnet |
+| **Compute Layer** | Execute iO obfuscation algorithms | Fluence Network | Decentralized VMs |
+| **Crypto Engine** | Diamond iO implementation (RLWE, trapdoors) | Rust + OpenFHE | WASM Runtime |
+| **Storage Layer** | Store obfuscated programs & ciphertexts | Filecoin Onchain Cloud | IPFS + Filecoin |
 
 ---
 
-## 2. How It Works (User Flow)
+## 2. Component Specifications
 
-### For Developers:
-1. **Write Logic**: Create program in supported DSL (e.g., arithmetic circuit, WASM subset)
-2. **Obfuscate**: Use CLI tool to generate:
-   - Obfuscated program blob (stored off-chain, e.g., IPFS)
-   - Verifier contract solidity code
-   - Deployment artifacts
-3. **Deploy**: Deploy verifier contract + register in DiamondIORegistry
-4. **Execute**: 
-   - Call `execute(inputs)` on verifier contract
-   - Coprocessor picks up event, runs obfuscated computation
-   - Result posted on-chain with cryptographic proof
+### 2.1 Request Portal (Solidity)
 
-### For Users:
-1. Send transaction with encrypted/private inputs to verifier contract
-2. Coprocessor processes inputs through obfuscated program
-3. Result + proof submitted on-chain
-4. Verifier contract validates proof and emits output
-
----
-
-## 3. Developer Interface
-
-### Solidity Integration
+**Primary Contract: `IOCoprocessor.sol`**
 
 ```solidity
-// Auto-generated Verifier Contract
-contract MyObfuscatedLogic is IDiamondIOVerifier {
-    address constant REGISTRY = 0x...;
-    bytes32 public programHash;
-    
-    function execute(bytes calldata encryptedInput) external payable {
-        // 1. Commit inputs to registry
-        uint256 requestId = DiamondIORegistry(REGISTRY).submitRequest(
-            programHash,
-            encryptedInput,
-            msg.sender
-        );
-        
-        // 2. Coprocessor listens and processes...
-        // 3. Callback with result
-    }
-    
-    // Called by coprocessor
-    function fulfill(
-        uint256 requestId,
-        bytes calldata output,
-        bytes calldata proof
-    ) external {
-        DiamondIORegistry(REGISTRY).verifyAndFulfill(
-            requestId,
-            output,
-            proof
-        );
-        
-        // Use output in your app
-        emit ComputationResult(requestId, output);
-    }
-}
-```
-
-### CLI Tooling
-
-```bash
-# Install
-cargo install dio-cli
-
-# Obfuscate program
-dio obfuscate \
-  --program ./my_logic.circ \
-  --params secure \
-  --output ./artifacts/ \
-  --generate-verifier
-
-# Deploy (uses foundry)
-dio deploy \
-  --verifier ./artifacts/verifier.sol \
-  --registry 0x... \
-  --rpc $RPC_URL
-
-# Test execution
-dio execute \
-  --program-hash 0x... \
-  --input "private_value:42" \
-  --rpc $RPC_URL
-```
-
----
-
-## 4. Hackathon MVP Scope
-
-### Phase 1: Core Coprocessor (Day 1-2)
-- [ ] **On-chain contracts**:
-  - `DiamondIORegistry.sol`: Request submission, event emission, proof verification stub
-  - `IDiamondIOVerifier.sol`: Interface for auto-generated verifiers
-  - Mock verifier for dummy parameters
-  
-- [ ] **Off-chain node**:
-  - Event listener (using `ethers-rs`)
-  - Diamond IO integration (wrap `diamond-io` crate)
-  - Proof generation (placeholder for hackathon)
-  - Result submission loop
-
-- [ ] **CLI tooling**:
-  - Basic `dio` command structure
-  - Program parsing (support minimal arithmetic circuits)
-  - Artifact generation
-
-### Phase 2: E2E Integration (Day 3-4)
-- [ ] **Circuit DSL**: Simple language for defining obfuscated logic
-  ```rust
-  // Example: Private voting logic
-  circuit {
-    input private: uint32[2]; // [vote, salt]
-    input public: address;
-    
-    // Obfuscated: verify signature, tally vote
-    bool valid = verify_signature(public, private[1]);
-    uint32 result = valid ? private[0] : 0;
-    
-    output result;
-  }
-  ```
-
-- [ ] **Solidity codegen**: Auto-generate verifier contracts from obfuscated programs
-- [ ] **IPFS integration**: Store program blobs off-chain
-- [ ] **Example app**: Private order matching, sealed-bid auction, or leverage calculation
-
-### Phase 3: Polish & Demo (Day 5)
-- [ ] **Docker setup**: One-command node deployment
-- [ ] **Frontend**: Minimal UI for deploying/obfuscating
-- [ ] **Gas optimization**: Commit-compress proofs, batched submissions
-- [ ] **Hackathon examples**: 3 working dApps showing iO uniqueness
-
----
-
-## 5. API Specification
-
-### DiamondIORegistry.sol
-
-```solidity
+// SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-interface IDiamondIORegistry {
-    event NewRequest(
-        bytes32 indexed programHash,
-        uint256 indexed requestId,
-        address indexed submitter,
-        bytes encryptedInput
-    );
-    
-    event RequestFulfilled(
-        uint256 indexed requestId,
-        bytes output,
-        bytes proof
-    );
-    
-    function submitRequest(
-        bytes32 programHash,
-        bytes calldata encryptedInput,
-        address callback
-    ) external payable returns (uint256 requestId);
-    
-    function verifyAndFulfill(
-        uint256 requestId,
-        bytes calldata output,
-        bytes calldata proof
+interface IIOCoprocessor {
+    struct ObfuscationRequest {
+        bytes32 programHash;    // IPFS hash of source program bytecode
+        bytes32 inputSchema;    // ABI-encoded input structure
+        uint256 securityParam;  // Security parameter λ (e.g., 128, 256)
+        address callback;       // Contract to notify on completion
+        bytes callbackData;     // Data for callback
+        uint256 maxFee;         // Maximum fee willing to pay
+    }
+
+    struct ObfuscationResult {
+        bytes32 ciphertextHash; // IPFS hash of obfuscated program
+        address operator;       // Operator who performed obfuscation
+        bytes32 attestation;    // Symbiotic attestation Merkle root
+        uint256 timestamp;
+        bool verified;
+    }
+
+    // Submit obfuscation request
+    function requestObfuscation(ObfuscationRequest calldata request) 
+        external payable returns (bytes32 requestId);
+
+    // Retrieve result (after attestation)
+    function getResult(bytes32 requestId) 
+        external view returns (ObfuscationResult memory);
+
+    // Callback function interface
+    function onObfuscationComplete(
+        bytes32 requestId,
+        ObfuscationResult calldata result
     ) external;
 }
 ```
 
-### DioNode API (Rust)
+**Key Features:**
+- **Request Lifecycle**: Requests emit `ObfuscationRequested` event with requestId
+- **Fee Escrow**: Fees held in contract until attestation verified
+- **Operator Registration**: Operators stake via Symbiotic vaults to participate
+- **Slashing Conditions**: Timeout, incorrect attestation, invalid ciphertext format
+
+### 2.2 Symbiotic Integration (Security & Attestation)
+
+**Operator Network Configuration**
+
+```yaml
+# symbiotic-config.yaml
+network:
+  name: "io-coprocessor-network"
+  vaults:
+    - collateral: "WETH"
+      curator: "0xCuratorAddress"
+      minStake: 1000e18  # 1000 WETH
+  operators:
+    - operatorId: "fluence-node-1"
+      stakeAllocation: 500e18
+      resolver: "0xResolverContract"
+  slashing:
+    timeout: 3600  # 1 hour
+    invalidResult: 1000e18  # Slash amount
+    falseAttestation: 2000e18  # Severe penalty
+```
+
+**Attestation Flow:**
+1. **Primary Node** (first operator to claim): Executes Diamond iO obfuscation
+2. **Attestation Nodes** (next 2-4 operators): Verify intermediate states
+3. **Resolver Contract**: Validates Merkle root of computation trace
+4. **Slashing**: Implemented via Symbiotic's `network.slash()` if attestation fails
+
+**Attestation Structure:**
+```solidity
+struct ObfuscationAttestation {
+    bytes32 requestId;
+    bytes32 computationRoot;  // Merkle root of RAM snapshots
+    bytes32 outputHash;       // Hash of obfuscated program
+    address[] attesters;      // Operators who signed
+    bytes32 resultProof;      // Succinct proof (future: zk-SNARK)
+}
+```
+
+### 2.3 Fluence Compute Network
+
+**Marine Wasm Module: `diamond-io-obfuscator.wasm`**
 
 ```rust
-// Core trait for obfuscation providers
-pub trait ObfuscationEngine {
-    fn obfuscate(
-        &self,
-        circuit: Circuit,
-        params: ObfuscationParams,
-    ) -> Result<ObfuscatedProgram, Error>;
-    
-    fn evaluate(
-        &self,
-        program: &ObfuscatedProgram,
-        input: &[u8],
-    ) -> Result<(Vec<u8>, Proof), Error>;
+// lib.rs (compiled to WASM)
+use marine_rs_sdk::marine;
+use diamond_io::obfuscate;
+
+#[marine]
+pub struct ObfuscationParams {
+    pub program_bytes: Vec<u8>,      // Program binary
+    pub security_param: u32,          // λ parameter
+    pub ring_dimension: u32,          // n parameter (power of 2)
+    pub crt_depth: u32,               // Moduli count
 }
 
-// Event handler
-pub async fn process_event(
-    registry: Address,
-    event: NewRequestEvent,
-    engine: &dyn ObfuscationEngine,
-) -> Result<(), Error> {
-    // 1. Fetch program from IPFS
-    // 2. Evaluate with encrypted input
-    // 3. Submit fulfillment tx
+#[marine]
+pub struct ObfuscationOutput {
+    pub ciphertext: Vec<u8>,         // Obfuscated program
+    pub proof: Vec<u8>,              // Computation proof
+    pub metrics: ComputeMetrics,
+}
+
+#[marine]
+pub fn obfuscate_program(params: ObfuscationParams) -> ObfuscationOutput {
+    // Initialize OpenFHE context
+    let context = diamond_io::Context::new(params.security_param);
+    
+    // Execute obfuscation (memory-intensive)
+    let obfuscated = obfuscate(&params.program_bytes, &context);
+    
+    // Generate computation trace for attestation
+    let proof = generate_merkle_proof(&obfuscated);
+    
+    ObfuscationOutput {
+        ciphertext: obfuscated.to_bytes(),
+        proof,
+        metrics: ComputeMetrics {
+            cpu_time_ms: 0,  // Populated
+            memory_gb: 0,     // Populated
+        },
+    }
+}
+```
+
+**Aqua Orchestration Script:**
+```aqua
+-- io_orchestration.aqua
+service IOCoprocessor("io-coprocessor-service"):
+  obfuscate_program: ObfuscationParams -> ObfuscationOutput
+
+func executeObfuscationJob(requestId: string, programCID: string, params: ObfuscationParams) -> ObfuscationResult:
+  -- Primary node fetches program
+  programBytes <- ipfs.get(programCID)
+  params.program_bytes = programBytes
+  
+  -- Execute obfuscation
+  result <- IOCoprocessor.obfuscate_program(params)
+  
+  -- Upload ciphertext to IPFS
+  ciphertextCID <- ipfs.put(result.ciphertext)
+  
+  -- Emit attestation event
+  co deal.notify(requestId, ciphertextCID, result.proof)
+  
+  <- ObfuscationResult(ciphertextCID, result.proof)
+```
+
+### 2.4 Filecoin Onchain Cloud Storage
+
+**Synapse SDK Integration**
+```typescript
+// storage-client.ts
+import { SynapseSDK } from '@filecoin/synapse';
+import { ethers } from 'ethers';
+
+const synapse = new SynapseSDK({
+  network: 'filecoin-onchain-cloud',
+  rpcUrl: 'https://api.node.glif.io',
+  wallet: new ethers.Wallet(privateKey)
+});
+
+// Store obfuscated program
+async function storeProgram(ciphertext: Uint8Array): Promise<string> {
+  // Pin to IPFS via Filecoin Pin service
+  const cid = await synapse.pin.cid({
+    data: ciphertext,
+    replication: 3,           // 3 copies
+    duration: 365 * 24 * 60 * 60 * 1000,  // 1 year
+    payment: 'prep'
+  });
+  
+  // Verify onchain proof
+  const proof = await synapse.proof.verify(cid);
+  if (!proof.isValid) throw new Error('Storage proof failed');
+  
+  return cid;
+}
+
+// Retrieve with incentivized retrieval
+async function retrieveProgram(cid: string): Promise<Uint8Array> {
+  return await synapse.beam.retrieve(cid, {
+    maxPrice: 100,  // FIL per GB
+    timeout: 30000
+  });
+}
+```
+
+**Onchain Storage Contract (ERC-3668 compliant)**
+```solidity
+// IOP_Storage.sol
+contract IOPStorage {
+    mapping(bytes32 => string) public programCID;  // requestId -> IPFS CID
+    mapping(string => bytes32) public cidToHash;   // CID -> content hash
+    
+    event ProgramStored(bytes32 indexed requestId, string cid, bytes32 contentHash);
+    
+    function storeResult(
+        bytes32 requestId,
+        string calldata cid,
+        bytes32 contentHash,
+        bytes calldata storageProof
+    ) external {
+        // Verify storage proof against Filecoin Onchain Cloud
+        require(verifyFILProof(storageProof, cid), "Invalid storage proof");
+        
+        programCID[requestId] = cid;
+        cidToHash[cid] = contentHash;
+        
+        emit ProgramStored(requestId, cid, contentHash);
+    }
 }
 ```
 
 ---
 
-## 6. Performance Targets (Hackathon Demo)
+## 3. Integration Flow
 
-| Metric | Dummy Params | Demo Params |
-|--------|--------------|-------------|
-| Obfuscation time | <5s | <2min |
-| Evaluation time | <1s | <10s |
-| On-chain gas (submit) | ~50k | ~100k |
-| On-chain gas (verify) | ~30k | ~200k |
-| Off-chain memory | ~500MB | ~8GB |
+### 3.1 Complete Obfuscation Job Flow
 
-*Note: Real iO is computationally intensive. Hackathon version uses reduced parameters for demo viability.*
+```mermaid
+sequenceDiagram
+    participant Dev as Developer
+    participant SC as IOCoprocessor.sol
+    participant Sym as Symbiotic
+    participant Flu as Fluence
+    participant FIL as Filecoin
+    
+    Dev->>SC: requestObfuscation() + fee
+    SC->>SC: emit ObfuscationRequested()
+    SC->>Sym: lock operator stake
+    
+    Note over Sym: Operator 1 claims job
+    Sym->>Flu: trigger computation task
+    
+    Flu->>FIL: fetchProgram(IPFS)
+    Flu->>Flu: execute diamond-io obfuscate_program()
+    Flu->>FIL: upload ciphertext to IPFS
+    
+    Flu->>Sym: submitAttestation(root, proof)
+    
+    Note over Sym: Operators 2-4 verify
+    loop Attestation Period (5 min)
+        Sym->>Flu: query intermediate state
+        Flu-->>Sym: Merkle proof
+        Sym->>Sym: verify consensus
+    end
+    
+    Sym->>SC: finalizeResult(attestation)
+    SC->>SC: release fee to operators
+    SC->>Dev: callback onObfuscationComplete()
+    
+    Note over Dev: Dev can now load ciphertext from IPFS
+```
+
+### 3.2 Event Schemas
+
+**Solidity Events:**
+```solidity
+event ObfuscationRequested(
+    bytes32 indexed requestId,
+    address indexed requester,
+    bytes32 programHash,
+    uint256 securityParam,
+    uint256 fee
+);
+
+event ComputationStarted(
+    bytes32 indexed requestId,
+    address indexed operator,
+    uint256 timestamp
+);
+
+event AttestationSubmitted(
+    bytes32 indexed requestId,
+    address indexed operator,
+    bytes32 attestationRoot,
+    uint256 stakeAmount
+);
+
+event ObfuscationComplete(
+    bytes32 indexed requestId,
+    string ciphertextCID,
+    bytes32 contentHash
+);
+```
 
 ---
 
-## 7. Security Considerations
+## 4. Developer API
 
-### For Hackathon (MVP):
-- **Trust model**: Coprocessor nodes are trusted for liveness, not correctness (proofs prevent malicious outputs)
-- **Parameter safety**: Clearly mark dummy params as "INSECURE - FOR TESTING ONLY"
-- **Proof system**: Use simplified KZG-like proofs; note this is not production-ready
-- **Private inputs**: UseElGamal encryption or similar; coprocessor decrypts with TEE or MPC (hackathon: mock this)
+### 4.1 Solidity Integration
 
-### Future Production:
-- Full ZK-SNARK for proof compression
-- Decentralized coprocessor network with threshold signatures
-- Formal verification of obfuscation toolchain
-- Post-quantum parameter sets
+```solidity
+// Example: FHE-like encrypted counter using iO
+contract PrivateCounter {
+    IIOCoprocessor public coprocessor;
+    bytes32 public obfuscatedProgramId;
+    
+    // Initialize with obfuscated increment program
+    function initialize(bytes32 programCID) external {
+        IIOCoprocessor.ObfuscationRequest memory req = IIOCoprocessor.ObfuscationRequest({
+            programHash: programCID,
+            inputSchema: keccak256("increment(uint256)"),
+            securityParam: 128,
+            callback: address(this),
+            callbackData: "",
+            maxFee: 1 ether
+        });
+        
+        obfuscatedProgramId = coprocessor.requestObfuscation{value: 1 ether}(req);
+    }
+    
+    // Callback when obfuscation complete
+    function onObfuscationComplete(
+        bytes32 requestId,
+        IIOCoprocessor.ObfuscationResult calldata result
+    ) external {
+        require(requestId == obfuscatedProgramId, "Invalid request");
+        // Store ciphertext CID for later execution
+    }
+}
+```
+
+### 4.2 JavaScript/TypeScript SDK
+
+```typescript
+import { IOCoprocessor } from '@io-coprocessor/sdk';
+import { ethers } from 'ethers';
+
+const io = new IOCoprocessor({
+  rpcUrl: 'https://mainnet.infura.io',
+  coprocessorAddress: '0x...',
+  symbioticResolver: '0x...',
+  fluencePeerId: '12D3KooW...'
+});
+
+// Simple API
+async function obfuscateAndDeploy(program: Uint8Array) {
+  // 1. Upload program to IPFS
+  const programCID = await io.storage.upload(program);
+  
+  // 2. Submit obfuscation request
+  const requestId = await io.coprocessor.requestObfuscation({
+    programHash: programCID,
+    securityParam: 128,
+    fee: ethers.utils.parseEther('1.0')
+  });
+  
+  // 3. Wait for completion (with attestation)
+  const result = await io.coprocessor.waitForResult(requestId);
+  
+  // 4. Verify attestation onchain
+  const isValid = await io.symbiotic.verifyAttestation(
+    result.attestation,
+    result.operator
+  );
+  
+  // 5. Use obfuscated program
+  return {
+    ciphertextCID: result.ciphertextHash,
+    verified: isValid
+  };
+}
+```
 
 ---
 
-## 8. Hackathon-Specific Setup
+## 5. Security Considerations
 
-### Quickstart (5 minutes)
+### 5.1 Threat Model
+
+| Threat | Impact | Mitigation |
+|--------|--------|------------|
+| Malicious Operator | Invalid obfuscation | Symbiotic slashing + attestation consensus |
+| Computation Timeout | Resource exhaustion | Fluence deal timeouts + fee burning |
+| Ciphertext Tampering | Wrong program behavior | Filecoin content addressing (CID) |
+| Front-running | Request stealing | Commit-reveal scheme for job claims |
+| Storage Unavailability | Data loss | Filecoin replication (3+ copies) + pinning |
+
+### 5.2 Cryptographic Parameters
+
+**Default Security Levels:**
+```rust
+// Recommended parameters for hackathon
+pub const HACKATHON_PARAMS: ObfuscationParams = ObfuscationParams {
+    security_param: 128,      // 128-bit security
+    ring_dimension: 4096,      // n = 2^12
+    crt_depth: 5,              // 5 moduli for correctness
+    base_bits: 24,             // Decomposition base
+    d: 8,                      // Secret key dimension
+};
+```
+
+**Production Security Levels:**
+```rust
+pub const PRODUCTION_PARAMS: ObfuscationParams = ObfuscationParams {
+    security_param: 256,      // 256-bit security
+    ring_dimension: 16384,     // n = 2^14
+    crt_depth: 8,              // 8 moduli
+    base_bits: 32,
+    d: 16,
+};
+```
+
+### 5.3 Slashing Conditions
+
+**Symbiotic Slashing Rules:**
+```solidity
+// Implemented in network-specific resolver
+function slashOperator(
+    address operator,
+    bytes32 requestId,
+    SlashReason reason
+) internal {
+    if (reason == SlashReason.TIMEOUT) {
+        // Operator failed to complete in 1 hour
+        symbiotic.slash(operator, 1000e18); // 1000 WETH
+    } else if (reason == SlashReason.INVALID_ATTESTATION) {
+        // Attestation verification failed
+        symbiotic.slash(operator, 2000e18); // Severe penalty
+    }
+}
+```
+
+---
+
+## 6. Economic Model
+
+### 6.1 Pricing Structure
+
+```typescript
+interface FeeStructure {
+  // Base fee covers Fluence compute costs
+  baseFee: bigint;           // USDC per CPU-second
+  
+  // Security fee for Symbiotic stake locking
+  securityFee: bigint;       // 5% of baseFee
+  
+  // Storage fee for Filecoin Onchain Cloud
+  storageFeePerGB: bigint;   // FIL per TB-month
+  
+  // Attestation fee for validator set
+  attestationFee: bigint;    // Split among 3-5 attesters
+}
+
+const HACKATHON_PRICING: FeeStructure = {
+  baseFee: 0.0001e6,        // $0.0001 per CPU-second (USDC)
+  securityFee: 0.000005e6,  // $0.000005 (5%)
+  storageFeePerGB: 5.99e18, // $5.99/TB/month (via Storacha)
+  attestationFee: 0.00002e6 // $0.00002 split among attesters
+};
+```
+
+### 6.2 Staking Requirements
+
+**Operator Stake Tiers:**
+- **Tier 1 (Primary)**: 1000 WETH minimum stake (executes obfuscation)
+- **Tier 2 (Attester)**: 500 WETH minimum stake (verifies results)
+- **Slashing Amount**: Up to 50% of stake for critical failures
+
+---
+
+## 7. Implementation Roadmap
+
+### Phase 1: Hackathon MVP (Week 1)
+
+- [ ] Deploy `IOCoprocessor.sol` to testnet (Base Sepolia)
+- [ ] Integrate Symbiotic testnet for operator registration
+- [ ] Wrap Diamond iO as Fluence Marine module
+- [ ] Implement basic obfuscation flow (dummy parameters)
+- [ ] Store ciphertext on Filecoin calibration network
+- [ ] Create sample Solidity contract that uses obfuscated program
+
+**Acceptance Criteria:**
+- Successfully obfuscate a 4-bit AND gate circuit
+- End-to-end flow in <5 minutes on testnet
+- At least 2 operators in attestation set
+
+### Phase 2: Pre-Production (Week 2-4)
+
+- [ ] Optimize Diamond iO for WASM (memory management)
+- [ ] Implement complete attestation protocol with Merkle proofs
+- [ ] Add slashing resolver contracts
+- [ ] Integrate Synapse SDK for production Filecoin storage
+- [ ] Create TypeScript SDK with automatic fee estimation
+- [ ] Benchmark with real parameters (128-bit security)
+
+### Phase 3: Production (Month 2-3)
+
+- [ ] Deploy to Ethereum mainnet with Symbiotic mainnet
+- [ ] Implement zk-SNARK proofs for attestation (succinct verification)
+- [ ] Add support for multiple security levels
+- [ ] Create operator marketplace UI
+- [ ] Audit all contracts and crypto implementation
+
+---
+
+## 8. Example Use Cases
+
+### 8.1 Private DeFi Logic
+```solidity
+// Obfuscate AMM pricing formula to prevent MEV
+contract PrivateAMM {
+    bytes32 public obfuscatedSwapProgram;
+    
+    function swap(uint256 amountIn) external {
+        // Load obfuscated program from IPFS
+        bytes memory program = ioStorage.load(obfuscatedSwapProgram);
+        
+        // Execute using IO coprocessor (off-chain)
+        uint256 amountOut = IOCoprocessor.execute(program, amountIn);
+        
+        // Transfer tokens based on obfuscated calculation
+    }
+}
+```
+
+### 8.2 Onchain Gaming with Hidden Mechanics
+```solidity
+// Game logic cannot be reverse-engineered
+contract StrategyGame {
+    function commitMove(bytes32 encryptedMove) external {
+        // Move is processed by obfuscated program
+        // No player can cheat by analyzing contract logic
+    }
+}
+```
+
+### 8.3 Proprietary Algorithm Licensing
+```solidity
+contract LicensedAlgorithm {
+    // Algorithm provider obfuscates their IP
+    // Users pay per execution without accessing source
+    function runAlgorithm(bytes memory input) external payable {
+        require(msg.value >= feePerRun, "Insufficient fee");
+        IOCoprocessor.execute(algorithmCID, input);
+    }
+}
+```
+
+---
+
+## 9. Deployment Configuration
+
+### 9.1 Testnet Addresses (Hackathon)
+
+| Network | Contract | Address |
+|---------|----------|---------|
+| Base Sepolia | IOCoprocessor | `0x...` (deployed) |
+| Symbiotic Testnet | Resolver | `0x...` |
+| Fluence Testnet | Peer Multiaddr | `/dns4/.../tcp/...` |
+| Filecoin Calibration | Synapse Gateway | `https://calibration.synapse.vercel.app` |
+
+### 9.2 Environment Variables
 
 ```bash
-# Clone and setup
-git clone --recurse-submodules https://github.com/MachinaIO/diamond-io-coprocessor
-cd diamond-io-coprocessor
-docker-compose up -d
+# Fluence
+FLUENCE_PEER_ID=12D3KooW...
+FLUENCE_PRIVATE_KEY=0x...
 
-# In another terminal
-cd dapp-examples
-cp .env.example .env
-# Edit .env with RPC_URL
+# Symbiotic
+SYMBIOTIC_NETWORK_ID=123
+SYMBIOTIC_RESOLVER_ADDRESS=0x...
+OPERATOR_PRIVATE_KEY=0x...
 
-# Deploy registry
-forge script script/Deploy.s.sol --rpc-url $RPC_URL --broadcast
+# Filecoin
+SYNAPSE_API_KEY=...
+FIL_WALLET_PRIVATE_KEY=0x...
 
-# Run example: Private voting
-cd examples/private-voting
-dio obfuscate --program voting.circ --output ./artifacts
-dio deploy --verifier ./artifacts/Voting.sol --registry $REGISTRY
-dio execute --program-hash $HASH --input "vote:1,salt:12345"
-```
-
-### Project Structure
-
-```
-diamond-io-coprocessor/
-├── contracts/          # Solidity contracts
-├── dio-node/           # Rust coprocessor node
-├── dio-cli/            # CLI tooling
-├── sdk/                # TypeScript SDK
-├── examples/           # Hackathon example dApps
-│   ├── private-voting/
-│   ├── sealed-bid-auction/
-│   └── onchain-poker/
-└── docker-compose.yml
+# Diamond iO
+OPENFHE_LIB_PATH=/usr/local/lib/libOPENFHE.so
+RUST_BACKTRACE=1
 ```
 
 ---
 
-## 9. Judging Criteria Alignment
+## 10. Performance Targets
 
-| Criteria | How We Deliver |
-|----------|----------------|
-| **Innovation** | First iO coprocessor for EVM; enables new class of private computation dApps |
-| **Technical Difficulty** | Integrating cutting-edge iO research (Diamond) with blockchain infrastructure |
-| **Practicality** | Solidity devs can obfuscate logic in 3 CLI commands; familiar workflow |
-| **Impact** | Unlocks private order books, hidden-state games, proprietary on-chain logic |
-| **Completeness** | E2E working MVP with 3 example dApps, CLI, docs, and Docker deployment |
-
----
-
-## 10. Resource Requirements
-
-### For Hackathon Team:
-- **Team size**: 3-4 people
-  - Rust dev (integrate `diamond-io` crate)
-  - Solidity dev (registry + verifier patterns)
-  - DevRel (examples, docs, CLI UX)
-  - Optional: Frontend (minimal UI)
-
-### Compute:
-- **Build**: 16GB RAM, 4 cores (for dummy params)
-- **Demo**: 64GB RAM, 8 cores (for secure-ish params)
-- **Cloud**: Use Rented GPU instance for faster obfuscation
+| Metric | Hackathon Target | Production Target |
+|--------|------------------|-------------------|
+| **Obfuscation Time** | <5 min (dummy params) | <1 hour (real params) |
+| **Attestation Time** | 2-3 min (3 operators) | 10-15 min (5 operators) |
+| **Storage Latency** | <30s (IPFS fetch) | <5s (Filecoin Beam) |
+| **Gas Cost** | <200k gas (request) | <100k gas (with zk-proof) |
+| **Memory Usage** | <16GB RAM | <128GB RAM (disk-backed) |
+| **Ciphertext Size** | ~100MB (small circuit) | ~10GB (complex program) |
 
 ---
 
-## 11. Example Use Cases for Demo
+## 11. Testing Strategy
 
-### A. Private Order Matching (DEX)
-- **Logic**: Match orders without revealing order book
-- **iO value**: Hide matching algorithm to prevent MEV
+### 11.1 Test Suite
 
-### B. Sealed-Bid Vickrey Auction
-- **Logic**: Second-price auction with private bids
-- **iO value**: Hide bid values until auction ends, hide winner calculation
+```javascript
+// Test obfuscation correctness
+describe("IO Coprocessor", () => {
+  it("should obfuscate 4-bit circuit correctly", async () => {
+    const program = compileCircuit("AND(a,b)");
+    const { ciphertextCID } = await obfuscateAndDeploy(program);
+    
+    // Execute with inputs
+    const result = await executeObfuscated(ciphertextCID, [1, 1]);
+    expect(result).to.equal(1);
+  });
+  
+  it("should slash operator on timeout", async () => {
+    const requestId = await submitRequest();
+    await increaseTime(3601); // 1 hour + 1 second
+    
+    const operatorStakeBefore = await symbiotic.getStake(operator);
+    await symbiotic.checkSlash(requestId);
+    const operatorStakeAfter = await symbiotic.getStake(operator);
+    
+    expect(operatorStakeAfter).to.be.lt(operatorStakeBefore);
+  });
+});
+```
 
-### C. On-Chain Poker with Hidden State
-- **Logic**: Shuffle and deal cards, manage private hands
-- **iO value**: Hide deck state, prevent front-running draws
-
----
-
-## 12. Deliverables Checklist
-
-- [ ] **Core**: Working coprocessor node + registry contract
-- [ ] **CLI**: `dio obfuscate`, `deploy`, `execute` commands
-- [ ] **Examples**: 3 working dApps with frontend
-- [ ] **Docs**: Setup guide, API reference, tutorial video
-- [ ] **Live Demo**: Deployed on testnet (Holesky/Arb Sepolia)
-- [ ] **Pitch Deck**: Technical architecture + use cases
-
----
-
-## 13. Risks & Mitigations
-
-| Risk | Probability | Mitigation |
-|------|-------------|------------|
-| Obfuscation too slow | High | Use dummy params for demo; pre-compute programs |
-| Memory overflow | Medium | Disk-backed matrices; limit circuit size |
-| Complex setup | High | Docker + comprehensive setup scripts |
-| Judges don't understand iO | High | Clear before/after examples; focus on dev UX |
-
----
-
-## 14. Future Roadmap (Post-Hackathon)
-
-- **Decentralization**: Network of nodes with threshold decryption
-- **Proof compression**: Full zk-SNARK verification on-chain
-- **DSL improvements**: Support higher-level languages (Cairo → iO)
-- **Hardware acceleration**: FPGA/ASIC for trapdoor sampling
-- **Production params**: Audit-safe parameter generation
-- **EVM precompile**: Native `DIAMOND_IO_VERIFY` opcode
+### 11.2 Benchmark Circuits
+- **4-bit AND gate** (simplest)
+- **AES-128 encryption** (realistic)
+- **SHA-256 hash** (complex)
+- **TinyML inference** (practical AI)
 
 ---
 
-## 15. Getting Started for Hackathon Judges
+## 12. References
 
-1. **Try the demo**: `docker run machinaio/diamond-io-demo`
-2. **Read examples**: Check `examples/private-voting/README.md`
-3. **Watch**: 2-minute explainer video (link in repo)
-4. **Test**: Run `cargo test -r --test e2e_coprocessor` in repo
-
-**Key Innovation**: We make iO practical for blockchain devs by wrapping academic implementation (Diamond) into a coprocessor pattern developers already understand from FHE.
+- **Diamond iO Paper**: https://eprint.iacr.org/2025/236
+- **Diamond iO Repo**: https://github.com/MachinaIO/diamond-io
+- **Symbiotic Docs**: https://docs.symbiotic.fi/
+- **Fluence Network**: https://fluence.network/
+- **Filecoin Onchain Cloud**: https://filecoin.io/blog/posts/introducing-filecoin-onchain-cloud/
+- **OpenFHE**: https://openfhe-development.readthedocs.io/
 
 ---
 
-This spec is designed to be hackathon-practical: focus on demonstrating the *concept* and *developer experience* rather than production-ready cryptography. The Diamond IO repo provides the heavy crypto; your job is to make it accessible to Solidity developers.
+## Appendix A: Quickstart Guide
+
+```bash
+# 1. Clone repositories
+git clone https://github.com/MachinaIO/diamond-io
+git clone https://github.com/your-io-coprocessor/repo
+
+# 2. Install dependencies
+cd diamond-io
+./install-openfhe.sh
+cargo build --release
+
+# 3. Build WASM module
+./build-fluence-module.sh
+
+# 4. Deploy contracts
+cd contracts
+npm install
+npx hardhat run scripts/deploy.js --network baseSepolia
+
+# 5. Run operator node
+cd operator
+npm start -- --stake 1000 --network symbiotic-testnet
+
+# 6. Submit test request
+cd examples
+node submit-obfuscation.js --program circuits/and4.circ
+```
+
+---
+
+**Last Updated**: 2025-11-22  
+**Maintainer**: Hackathon Team  
+**License**: MIT (Diamond iO), Apache 2.0 (Coprocessor)
