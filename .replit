@@ -15,15 +15,15 @@ author = "agent"
 
 [[workflows.workflow.tasks]]
 task = "workflow.run"
-args = "Docusaurus"
+args = "0G RAG Agent"
 
 [[workflows.workflow]]
-name = "Docusaurus"
+name = "0G RAG Agent"
 author = "agent"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "cd docs && npm start"
+args = "cd 0g && npm run dev"
 waitForPort = 5000
 
 [workflows.workflow.metadata]
@@ -32,6 +32,10 @@ outputType = "webview"
 [[ports]]
 localPort = 5000
 externalPort = 80
+
+[[ports]]
+localPort = 34973
+externalPort = 3000
 
 [deployment]
 deploymentTarget = "static"

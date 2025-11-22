@@ -50,6 +50,26 @@ export default function RAGAgent() {
     }
   }
 
+  const handleIndexLocal = async () => {
+    setIndexLoading(true)
+    setStatus('Building RAG index from local file (chunking & embedding)...')
+    try {
+      const res = await fetch('/api/index-local', { method: 'POST' })
+      const data = await res.json()
+      if (data.success) {
+        setIndexed(true)
+        setRootHash('local-file')
+        setStatus(`Indexed! ${data.chunks} chunks created`)
+      } else {
+        setStatus(`Indexing failed: ${data.error}`)
+      }
+    } catch (err: any) {
+      setStatus(`Error: ${err.message}`)
+    } finally {
+      setIndexLoading(false)
+    }
+  }
+
   const handleIndex = async () => {
     if (!rootHash) {
       setStatus('Please upload first')
@@ -115,45 +135,64 @@ export default function RAGAgent() {
         </h1>
         <p className="text-xl text-gray-300 mb-8">Diamond IO Codebase Expert</p>
 
-        <div className="grid md:grid-cols-2 gap-6 mb-8">
-          <div className="bg-white/10 backdrop-blur-lg rounded-xl p-6 shadow-2xl border border-white/20">
-            <h2 className="text-2xl font-semibold mb-4">Step 1: Upload to 0G Storage</h2>
-            <p className="text-gray-300 mb-4">Upload repomix-output.xml to decentralized storage</p>
-            <button
-              onClick={handleUpload}
-              disabled={uploadLoading}
-              className="w-full bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 disabled:from-gray-500 disabled:to-gray-600 px-6 py-3 rounded-lg font-semibold transition-all transform hover:scale-105 disabled:scale-100"
-            >
-              {uploadLoading ? 'Uploading...' : 'Upload XML File'}
-            </button>
-            {rootHash && (
-              <div className="mt-4 p-3 bg-black/30 rounded-lg">
-                <p className="text-xs text-gray-400">Root Hash:</p>
-                <p className="text-sm font-mono text-green-400 break-all">{rootHash}</p>
-              </div>
-            )}
-          </div>
-
-          <div className="bg-white/10 backdrop-blur-lg rounded-xl p-6 shadow-2xl border border-white/20">
-            <h2 className="text-2xl font-semibold mb-4">Step 2: Build RAG Index</h2>
-            <p className="text-gray-300 mb-4">Chunk, embed & index the codebase</p>
-            <button
-              onClick={handleIndex}
-              disabled={indexLoading || !rootHash}
-              className="w-full bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 disabled:from-gray-500 disabled:to-gray-600 px-6 py-3 rounded-lg font-semibold transition-all transform hover:scale-105 disabled:scale-100"
-            >
-              {indexLoading ? 'Indexing...' : 'Build RAG Index'}
-            </button>
-            <div className="mt-4 p-3 bg-black/30 rounded-lg">
-              <p className="text-sm">
-                <span className={indexed ? 'text-green-400' : 'text-yellow-400'}>
-                  {indexed ? '✓ ' : '○ '}
-                </span>
-                {status}
-              </p>
-            </div>
+        <div className="bg-white/10 backdrop-blur-lg rounded-xl p-6 shadow-2xl border border-white/20 mb-6">
+          <h2 className="text-2xl font-semibold mb-4">Quick Start: Index Local File</h2>
+          <p className="text-gray-300 mb-4">
+            Build RAG index directly from the local repomix-output.xml file (no 0G upload needed)
+          </p>
+          <button
+            onClick={handleIndexLocal}
+            disabled={indexLoading || indexed}
+            className="w-full bg-gradient-to-r from-green-500 to-teal-500 hover:from-green-600 hover:to-teal-600 disabled:from-gray-500 disabled:to-gray-600 px-6 py-3 rounded-lg font-semibold transition-all transform hover:scale-105 disabled:scale-100"
+          >
+            {indexLoading ? 'Indexing...' : indexed ? 'Already Indexed' : 'Index Local File & Start'}
+          </button>
+          <div className="mt-4 p-3 bg-black/30 rounded-lg">
+            <p className="text-sm">
+              <span className={indexed ? 'text-green-400' : 'text-yellow-400'}>
+                {indexed ? '✓ ' : '○ '}
+              </span>
+              {status}
+            </p>
           </div>
         </div>
+
+        <details className="mb-6">
+          <summary className="cursor-pointer text-gray-300 hover:text-white mb-2">
+            Advanced: Use 0G Decentralized Storage
+          </summary>
+          <div className="grid md:grid-cols-2 gap-6 mt-4">
+            <div className="bg-white/10 backdrop-blur-lg rounded-xl p-6 shadow-2xl border border-white/20">
+              <h2 className="text-2xl font-semibold mb-4">Step 1: Upload to 0G Storage</h2>
+              <p className="text-gray-300 mb-4">Upload repomix-output.xml to decentralized storage</p>
+              <button
+                onClick={handleUpload}
+                disabled={uploadLoading}
+                className="w-full bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 disabled:from-gray-500 disabled:to-gray-600 px-6 py-3 rounded-lg font-semibold transition-all transform hover:scale-105 disabled:scale-100"
+              >
+                {uploadLoading ? 'Uploading...' : 'Upload XML File'}
+              </button>
+              {rootHash && rootHash !== 'local-file' && (
+                <div className="mt-4 p-3 bg-black/30 rounded-lg">
+                  <p className="text-xs text-gray-400">Root Hash:</p>
+                  <p className="text-sm font-mono text-green-400 break-all">{rootHash}</p>
+                </div>
+              )}
+            </div>
+
+            <div className="bg-white/10 backdrop-blur-lg rounded-xl p-6 shadow-2xl border border-white/20">
+              <h2 className="text-2xl font-semibold mb-4">Step 2: Build RAG Index</h2>
+              <p className="text-gray-300 mb-4">Chunk, embed & index from 0G Storage</p>
+              <button
+                onClick={handleIndex}
+                disabled={indexLoading || !rootHash || rootHash === 'local-file'}
+                className="w-full bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 disabled:from-gray-500 disabled:to-gray-600 px-6 py-3 rounded-lg font-semibold transition-all transform hover:scale-105 disabled:scale-100"
+              >
+                {indexLoading ? 'Indexing...' : 'Build RAG Index from 0G'}
+              </button>
+            </div>
+          </div>
+        </details>
 
         <div className="bg-white/10 backdrop-blur-lg rounded-xl p-6 shadow-2xl border border-white/20">
           <h2 className="text-2xl font-semibold mb-4">Step 3 & 4: Query the Agent</h2>
