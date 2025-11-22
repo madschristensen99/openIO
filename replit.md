@@ -19,33 +19,43 @@ The IO Coprocessor enables Solidity smart contracts to leverage Indistinguishabi
 ## Current State
 
 ### Active Frontend
-- **Docusaurus Documentation Website**: Running on port 5000 in development mode
-- Status: Development server configured and operational
+- **0G RAG Agent**: Running on port 5000 - AI-powered codebase chat interface
+- Status: Development server running and operational
 - Access: Available through the webview preview
-- Deployment: Configured for static site deployment via Replit publish button
+- Purpose: Query the Diamond IO codebase using natural language
 
 ### Project Components
+- **0g/**: Next.js RAG agent for querying the Diamond IO codebase
 - **docs/**: Docusaurus website with tutorials, blog, and documentation
 - **symbiotic/**: Smart contract examples for task-based networks
-- **0g/**, **diamond-io/**: Additional blockchain integration components
+- **diamond-io/**: Additional blockchain integration components
 
 ## Recent Changes (November 22, 2025)
 
-- Installed Node.js 20 runtime environment
-- Configured Docusaurus to run on port 5000 with host 0.0.0.0 for Replit proxy compatibility
-- Set up workflow for automatic Docusaurus server startup
-- Created .gitignore with Node.js and Foundry-specific rules
-- Configured deployment for static site generation
-- Installed all npm dependencies for Docusaurus
+### 0G RAG Agent Setup
+- Created Next.js 16 application with TypeScript and Tailwind CSS
+- Implemented automatic RAG indexing on first load
+- Built chat interface for querying the Diamond IO codebase
+- Integrated OpenAI for embeddings (text-embedding-3-small) and chat (GPT-4)
+- Configured semantic search with cosine similarity
+- Set up workflow for automatic server startup on port 5000
+- Added error handling and status displays for user feedback
 
 ## Project Architecture
 
-### Frontend (Docusaurus)
-- **Location**: `docs/`
-- **Technology**: Docusaurus 3.9.2, React 19, TypeScript
+### 0G RAG Agent (Active)
+- **Location**: `0g/`
+- **Technology**: Next.js 16, React 19, TypeScript, Tailwind CSS
 - **Port**: 5000
 - **Host**: 0.0.0.0 (configured for Replit proxy)
+- **Purpose**: AI-powered codebase query interface using RAG
+- **Features**: Automatic indexing, semantic search, GPT-4 answers
+
+### Docusaurus Documentation
+- **Location**: `docs/`
+- **Technology**: Docusaurus 3.9.2, React 19, TypeScript
 - **Build Output**: `docs/build/`
+- **Status**: Available for deployment
 
 ### Smart Contracts (Symbiotic)
 - **Location**: `symbiotic/`
@@ -56,19 +66,26 @@ The IO Coprocessor enables Solidity smart contracts to leverage Indistinguishabi
 ### Structure
 ```
 .
+├── 0g/                    # 0G RAG Agent (Active)
+│   ├── app/              # Next.js app directory
+│   │   ├── api/          # API routes (index-local, query, status)
+│   │   ├── page.tsx      # Chat interface
+│   │   └── layout.tsx    # Root layout
+│   ├── lib/              # Core logic
+│   │   ├── rag.ts        # RAG pipeline (chunking, embeddings, search)
+│   │   └── storage.ts    # 0G Storage integration (optional)
+│   ├── repomix-output.xml # Diamond IO codebase snapshot
+│   └── package.json      # Dependencies
 ├── docs/                  # Docusaurus documentation site
 │   ├── blog/             # Blog posts
 │   ├── docs/             # Documentation content
 │   ├── src/              # React components and pages
-│   ├── static/           # Static assets
 │   └── package.json      # Node.js dependencies
 ├── symbiotic/            # Solidity smart contracts
 │   ├── src/              # Contract source files
 │   ├── script/           # Deployment scripts
-│   ├── test/             # Contract tests
-│   └── foundry.toml      # Foundry configuration
-├── spec.md               # Technical specification
-└── README.md             # Project readme
+│   └── test/             # Contract tests
+└── spec.md               # Technical specification
 ```
 
 ## User Preferences
@@ -80,19 +97,24 @@ The IO Coprocessor enables Solidity smart contracts to leverage Indistinguishabi
 
 ## Development Workflow
 
+### Using the 0G RAG Agent (Current)
+The RAG agent runs automatically on port 5000. To use it:
+1. Add your `OPENAI_API_KEY` in the Secrets tab
+2. Open the webview - the agent will automatically index the codebase
+3. Start asking questions about the Diamond IO codebase in the chat interface
+
 ### Running the Documentation Site
-The Docusaurus site starts automatically via the configured workflow:
 ```bash
 cd docs && npm start
 ```
 
-### Building for Production
+### Building Documentation for Production
 ```bash
 cd docs && npm run build
 ```
 
 ### Working with Smart Contracts
-The symbiotic directory contains Foundry-based smart contracts. See `symbiotic/README.md` for detailed setup instructions including Docker-based local network deployment.
+The symbiotic directory contains Foundry-based smart contracts. See `symbiotic/README.md` for detailed setup instructions.
 
 ## Deployment
 
