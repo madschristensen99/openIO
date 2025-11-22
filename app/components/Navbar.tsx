@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
+import WalletConnect from './WalletConnect';
 
 export default function Navbar() {
   const [isDarkMode, setIsDarkMode] = useState(true);
@@ -53,6 +54,7 @@ export default function Navbar() {
           <Link href="/community" className="nav-link">Community</Link>
           <Link href="/docs" className="nav-link">Docs</Link>
           <Link href="/profile" className="nav-link">Profile</Link>
+          <WalletConnect />
           <label className="theme-toggle-switch">
             <input
               type="checkbox"
