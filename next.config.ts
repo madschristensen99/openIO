@@ -3,7 +3,9 @@ import type { NextConfig } from "next";
 const nextConfig: NextConfig = {
   /* config options here */
   // Exclude 0g directory from build as it's a separate project
-  pageExtensions: ['tsx', 'ts', 'jsx', 'js'],
+  // Turbopack config (Next.js 16+)
+  turbopack: {},
+  // Webpack config for compatibility
   webpack: (config, { isServer }) => {
     config.watchOptions = {
       ...config.watchOptions,
