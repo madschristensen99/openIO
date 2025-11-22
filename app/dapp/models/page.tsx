@@ -9,7 +9,8 @@ export default function ModelsPage() {
   const [searchQuery, setSearchQuery] = useState('');
 
   const filteredModels = useMemo(() => {
-    let filtered = models;
+    // Exclude operations from all models
+    let filtered = models.filter(m => m.category !== 'operation');
 
     // Filter by category
     if (selectedCategory !== 'all') {
@@ -31,12 +32,12 @@ export default function ModelsPage() {
   }, [selectedCategory, searchQuery]);
 
   const categoryCounts = useMemo(() => {
+    const nonOperationModels = models.filter(m => m.category !== 'operation');
     return {
-      all: models.length,
+      all: nonOperationModels.length,
       zk: getModelsByCategory('zk').length,
       fhe: getModelsByCategory('fhe').length,
       io: getModelsByCategory('io').length,
-      operation: getModelsByCategory('operation').length,
     };
   }, []);
 
@@ -53,7 +54,6 @@ export default function ModelsPage() {
                   className={`category-item ${selectedCategory === 'all' ? 'active' : ''}`}
                   onClick={() => setSelectedCategory('all')}
                 >
-                  <span className="category-icon">📦</span>
                   <div className="category-info">
                     <span className="category-name">All Models</span>
                     <span className="category-count">{categoryCounts.all}</span>
@@ -63,7 +63,6 @@ export default function ModelsPage() {
                   className={`category-item ${selectedCategory === 'zk' ? 'active' : ''}`}
                   onClick={() => setSelectedCategory('zk')}
                 >
-                  <span className="category-icon">🔐</span>
                   <div className="category-info">
                     <span className="category-name">ZK Circuits</span>
                     <span className="category-count">{categoryCounts.zk}</span>
@@ -73,7 +72,6 @@ export default function ModelsPage() {
                   className={`category-item ${selectedCategory === 'fhe' ? 'active' : ''}`}
                   onClick={() => setSelectedCategory('fhe')}
                 >
-                  <span className="category-icon">🔒</span>
                   <div className="category-info">
                     <span className="category-name">FHE Engines</span>
                     <span className="category-count">{categoryCounts.fhe}</span>
@@ -83,20 +81,9 @@ export default function ModelsPage() {
                   className={`category-item ${selectedCategory === 'io' ? 'active' : ''}`}
                   onClick={() => setSelectedCategory('io')}
                 >
-                  <span className="category-icon">👁️</span>
                   <div className="category-info">
                     <span className="category-name">iO Coprocessors</span>
                     <span className="category-count">{categoryCounts.io}</span>
-                  </div>
-                </button>
-                <button
-                  className={`category-item ${selectedCategory === 'operation' ? 'active' : ''}`}
-                  onClick={() => setSelectedCategory('operation')}
-                >
-                  <span className="category-icon">⚙️</span>
-                  <div className="category-info">
-                    <span className="category-name">Operations</span>
-                    <span className="category-count">{categoryCounts.operation}</span>
                   </div>
                 </button>
               </div>
@@ -117,7 +104,6 @@ export default function ModelsPage() {
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className="search-input"
                 />
-                <span className="search-icon">🔍</span>
               </div>
             </div>
 
@@ -144,11 +130,23 @@ export default function ModelsPage() {
                       </div>
                     )}
                     <div className="model-meta">
-                      <span className="meta-item">📥 {model.downloads}</span>
-                      <span className="meta-item">❤️ {model.likes}</span>
-                      <span className="meta-item">🕒 {model.updated}</span>
+                      <span className="meta-item">
+                        <span className="meta-label">Downloads</span>
+                        <span className="meta-value">{model.downloads}</span>
+                      </span>
+                      <span className="meta-item">
+                        <span className="meta-label">Likes</span>
+                        <span className="meta-value">{model.likes}</span>
+                      </span>
+                      <span className="meta-item">
+                        <span className="meta-label">Updated</span>
+                        <span className="meta-value">{model.updated}</span>
+                      </span>
                       {model.parameters && (
-                        <span className="meta-item">📊 {model.parameters}</span>
+                        <span className="meta-item">
+                          <span className="meta-label">Parameters</span>
+                          <span className="meta-value">{model.parameters}</span>
+                        </span>
                       )}
                     </div>
                   </div>
