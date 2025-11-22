@@ -1,97 +1,48 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 
 export default function RAGAgent() {
-  const [status, setStatus] = useState<string>('Not uploaded')
   const [indexed, setIndexed] = useState<boolean>(false)
   const [question, setQuestion] = useState<string>('')
-  const [answer, setAnswer] = useState<string>('')
   const [loading, setLoading] = useState<boolean>(false)
-  const [uploadLoading, setUploadLoading] = useState<boolean>(false)
   const [indexLoading, setIndexLoading] = useState<boolean>(false)
-  const [rootHash, setRootHash] = useState<string>('')
+  const [indexError, setIndexError] = useState<string>('')
+  const [chunkCount, setChunkCount] = useState<number>(0)
   const [chatHistory, setChatHistory] = useState<Array<{ role: string; content: string }>>([])
+  const chatEndRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
-    checkIndexStatus()
+    initializeIndex()
   }, [])
 
-  const checkIndexStatus = async () => {
-    try {
-      const res = await fetch('/api/status')
-      const data = await res.json()
-      if (data.indexed) {
-        setIndexed(true)
-        setStatus('Indexed and ready')
-        setRootHash(data.rootHash || '')
-      }
-    } catch (err) {
-      console.error('Error checking status:', err)
-    }
-  }
+  useEffect(() => {
+    chatEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [chatHistory])
 
-  const handleUpload = async () => {
-    setUploadLoading(true)
-    setStatus('Uploading to 0G Storage...')
+  const initializeIndex = async () => {
     try {
-      const res = await fetch('/api/upload', { method: 'POST' })
-      const data = await res.json()
-      if (data.success) {
-        setRootHash(data.rootHash)
-        setStatus(`Uploaded! Root Hash: ${data.rootHash.substring(0, 20)}...`)
+      const statusRes = await fetch('/api/status')
+      const statusData = await statusRes.json()
+      
+      if (statusData.indexed) {
+        setIndexed(true)
+        setChunkCount(statusData.chunks || 0)
       } else {
-        setStatus(`Upload failed: ${data.error}`)
+        setIndexLoading(true)
+        const indexRes = await fetch('/api/index-local', { method: 'POST' })
+        const indexData = await indexRes.json()
+        
+        if (indexData.success) {
+          setIndexed(true)
+          setChunkCount(indexData.chunks || 0)
+        } else {
+          setIndexError(indexData.error || 'Failed to index codebase. Please check your OpenAI API key.')
+        }
       }
     } catch (err: any) {
-      setStatus(`Error: ${err.message}`)
-    } finally {
-      setUploadLoading(false)
-    }
-  }
-
-  const handleIndexLocal = async () => {
-    setIndexLoading(true)
-    setStatus('Building RAG index from local file (chunking & embedding)...')
-    try {
-      const res = await fetch('/api/index-local', { method: 'POST' })
-      const data = await res.json()
-      if (data.success) {
-        setIndexed(true)
-        setRootHash('local-file')
-        setStatus(`Indexed! ${data.chunks} chunks created`)
-      } else {
-        setStatus(`Indexing failed: ${data.error}`)
-      }
-    } catch (err: any) {
-      setStatus(`Error: ${err.message}`)
-    } finally {
-      setIndexLoading(false)
-    }
-  }
-
-  const handleIndex = async () => {
-    if (!rootHash) {
-      setStatus('Please upload first')
-      return
-    }
-    setIndexLoading(true)
-    setStatus('Building RAG index (chunking & embedding)...')
-    try {
-      const res = await fetch('/api/index', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ rootHash }),
-      })
-      const data = await res.json()
-      if (data.success) {
-        setIndexed(true)
-        setStatus(`Indexed! ${data.chunks} chunks created`)
-      } else {
-        setStatus(`Indexing failed: ${data.error}`)
-      }
-    } catch (err: any) {
-      setStatus(`Error: ${err.message}`)
+      console.error('Error initializing index:', err)
+      setIndexError(err.message || 'Failed to initialize. Please refresh the page.')
     } finally {
       setIndexLoading(false)
     }
@@ -99,12 +50,12 @@ export default function RAGAgent() {
 
   const handleQuery = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!question.trim() || !indexed) return
+    if (!question.trim() || !indexed || loading) return
 
-    setLoading(true)
-    setAnswer('')
     const userMessage = { role: 'user', content: question }
     setChatHistory(prev => [...prev, userMessage])
+    setQuestion('')
+    setLoading(true)
 
     try {
       const res = await fetch('/api/query', {
@@ -113,145 +64,153 @@ export default function RAGAgent() {
         body: JSON.stringify({ question, chatHistory }),
       })
       const data = await res.json()
+      
       if (data.success) {
-        setAnswer(data.answer)
         setChatHistory(prev => [...prev, { role: 'assistant', content: data.answer }])
       } else {
-        setAnswer(`Error: ${data.error}`)
+        setChatHistory(prev => [...prev, { 
+          role: 'assistant', 
+          content: `Error: ${data.error}` 
+        }])
       }
     } catch (err: any) {
-      setAnswer(`Error: ${err.message}`)
+      setChatHistory(prev => [...prev, { 
+        role: 'assistant', 
+        content: `Error: ${err.message}` 
+      }])
     } finally {
       setLoading(false)
-      setQuestion('')
     }
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-purple-900 to-blue-900 text-white p-8">
-      <div className="max-w-6xl mx-auto">
-        <h1 className="text-5xl font-bold mb-2 bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-purple-400">
-          0G RAG Agent
-        </h1>
-        <p className="text-xl text-gray-300 mb-8">Diamond IO Codebase Expert</p>
-
-        <div className="bg-white/10 backdrop-blur-lg rounded-xl p-6 shadow-2xl border border-white/20 mb-6">
-          <h2 className="text-2xl font-semibold mb-4">Quick Start: Index Local File</h2>
-          <p className="text-gray-300 mb-4">
-            Build RAG index directly from the local repomix-output.xml file (no 0G upload needed)
+    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-purple-900 to-blue-900 text-white">
+      <div className="max-w-4xl mx-auto flex flex-col h-screen">
+        <div className="p-6 border-b border-white/10">
+          <h1 className="text-4xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-purple-400">
+            Diamond IO Codebase Expert
+          </h1>
+          <p className="text-gray-300 mt-2">
+            {indexLoading ? 'Indexing codebase...' : indexed ? `Ready • ${chunkCount} chunks indexed` : indexError ? 'Initialization failed' : 'Initializing...'}
           </p>
-          <button
-            onClick={handleIndexLocal}
-            disabled={indexLoading || indexed}
-            className="w-full bg-gradient-to-r from-green-500 to-teal-500 hover:from-green-600 hover:to-teal-600 disabled:from-gray-500 disabled:to-gray-600 px-6 py-3 rounded-lg font-semibold transition-all transform hover:scale-105 disabled:scale-100"
-          >
-            {indexLoading ? 'Indexing...' : indexed ? 'Already Indexed' : 'Index Local File & Start'}
-          </button>
-          <div className="mt-4 p-3 bg-black/30 rounded-lg">
-            <p className="text-sm">
-              <span className={indexed ? 'text-green-400' : 'text-yellow-400'}>
-                {indexed ? '✓ ' : '○ '}
-              </span>
-              {status}
-            </p>
-          </div>
-        </div>
-
-        <details className="mb-6">
-          <summary className="cursor-pointer text-gray-300 hover:text-white mb-2">
-            Advanced: Use 0G Decentralized Storage
-          </summary>
-          <div className="grid md:grid-cols-2 gap-6 mt-4">
-            <div className="bg-white/10 backdrop-blur-lg rounded-xl p-6 shadow-2xl border border-white/20">
-              <h2 className="text-2xl font-semibold mb-4">Step 1: Upload to 0G Storage</h2>
-              <p className="text-gray-300 mb-4">Upload repomix-output.xml to decentralized storage</p>
-              <button
-                onClick={handleUpload}
-                disabled={uploadLoading}
-                className="w-full bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 disabled:from-gray-500 disabled:to-gray-600 px-6 py-3 rounded-lg font-semibold transition-all transform hover:scale-105 disabled:scale-100"
-              >
-                {uploadLoading ? 'Uploading...' : 'Upload XML File'}
-              </button>
-              {rootHash && rootHash !== 'local-file' && (
-                <div className="mt-4 p-3 bg-black/30 rounded-lg">
-                  <p className="text-xs text-gray-400">Root Hash:</p>
-                  <p className="text-sm font-mono text-green-400 break-all">{rootHash}</p>
-                </div>
-              )}
-            </div>
-
-            <div className="bg-white/10 backdrop-blur-lg rounded-xl p-6 shadow-2xl border border-white/20">
-              <h2 className="text-2xl font-semibold mb-4">Step 2: Build RAG Index</h2>
-              <p className="text-gray-300 mb-4">Chunk, embed & index from 0G Storage</p>
-              <button
-                onClick={handleIndex}
-                disabled={indexLoading || !rootHash || rootHash === 'local-file'}
-                className="w-full bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 disabled:from-gray-500 disabled:to-gray-600 px-6 py-3 rounded-lg font-semibold transition-all transform hover:scale-105 disabled:scale-100"
-              >
-                {indexLoading ? 'Indexing...' : 'Build RAG Index from 0G'}
-              </button>
-            </div>
-          </div>
-        </details>
-
-        <div className="bg-white/10 backdrop-blur-lg rounded-xl p-6 shadow-2xl border border-white/20">
-          <h2 className="text-2xl font-semibold mb-4">Step 3 & 4: Query the Agent</h2>
-          
-          <div className="mb-4 max-h-96 overflow-y-auto space-y-4">
-            {chatHistory.map((msg, idx) => (
-              <div
-                key={idx}
-                className={`p-4 rounded-lg ${
-                  msg.role === 'user'
-                    ? 'bg-blue-600/30 ml-12'
-                    : 'bg-purple-600/30 mr-12'
-                }`}
-              >
-                <p className="text-xs text-gray-400 mb-1">
-                  {msg.role === 'user' ? 'You' : 'DIO Expert Agent'}
-                </p>
-                <p className="whitespace-pre-wrap">{msg.content}</p>
-              </div>
-            ))}
-          </div>
-
-          <form onSubmit={handleQuery} className="space-y-4">
-            <div>
-              <label className="block text-sm text-gray-300 mb-2">Ask a technical question:</label>
-              <textarea
-                value={question}
-                onChange={(e) => setQuestion(e.target.value)}
-                placeholder="e.g., What does BenchCircuit::new_add_mul do?"
-                className="w-full px-4 py-3 rounded-lg bg-black/30 border border-white/20 focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-500/50 min-h-24"
-                disabled={!indexed}
-              />
-            </div>
-            <button
-              type="submit"
-              disabled={loading || !indexed || !question.trim()}
-              className="w-full bg-gradient-to-r from-green-500 to-blue-500 hover:from-green-600 hover:to-blue-600 disabled:from-gray-500 disabled:to-gray-600 px-6 py-3 rounded-lg font-semibold transition-all transform hover:scale-105 disabled:scale-100"
-            >
-              {loading ? 'Agent is thinking...' : 'Ask Agent'}
-            </button>
-          </form>
-
-          {!indexed && (
-            <div className="mt-4 p-4 bg-yellow-500/20 border border-yellow-500/50 rounded-lg">
-              <p className="text-yellow-200">
-                ⚠️ Please upload and index the file first before querying
-              </p>
+          {indexError && (
+            <div className="mt-3 p-3 bg-red-500/20 border border-red-500/50 rounded-lg text-sm text-red-200">
+              <strong>Error:</strong> {indexError}
             </div>
           )}
         </div>
 
-        <div className="mt-6 p-4 bg-black/30 rounded-lg">
-          <h3 className="text-sm font-semibold mb-2 text-gray-400">Example Questions:</h3>
-          <ul className="text-sm text-gray-300 space-y-1">
-            <li>• What does BenchCircuit::new_add_mul do?</li>
-            <li>• Explain the role of switched_modulus in RunBenchConfig</li>
-            <li>• How does BuildCircuit compute final gates?</li>
-            <li>• What cryptographic primitives are used in the diamond-io system?</li>
-          </ul>
+        <div className="flex-1 overflow-y-auto p-6 space-y-4">
+          {indexError && !indexed && (
+            <div className="text-center py-12">
+              <div className="text-6xl mb-4">⚠️</div>
+              <h2 className="text-2xl font-semibold mb-4">Unable to initialize RAG agent</h2>
+              <p className="text-gray-300 max-w-md mx-auto">
+                Please make sure you have provided your OpenAI API key in the Secrets tab and refresh the page.
+              </p>
+              <button
+                onClick={() => window.location.reload()}
+                className="mt-6 px-6 py-3 bg-purple-500 hover:bg-purple-600 rounded-lg font-semibold transition"
+              >
+                Refresh Page
+              </button>
+            </div>
+          )}
+
+          {chatHistory.length === 0 && indexed && (
+            <div className="text-center py-12">
+              <div className="text-6xl mb-4">💬</div>
+              <h2 className="text-2xl font-semibold mb-4">Ask me anything about the Diamond IO codebase</h2>
+              <div className="max-w-2xl mx-auto text-left bg-white/5 rounded-lg p-6 space-y-2">
+                <p className="text-sm text-gray-400 font-semibold mb-3">Example questions:</p>
+                <button 
+                  onClick={() => setQuestion('What does BenchCircuit::new_add_mul do?')}
+                  className="block w-full text-left text-gray-300 hover:text-white hover:bg-white/10 p-3 rounded-lg transition"
+                >
+                  • What does BenchCircuit::new_add_mul do?
+                </button>
+                <button 
+                  onClick={() => setQuestion('Explain the role of switched_modulus in RunBenchConfig')}
+                  className="block w-full text-left text-gray-300 hover:text-white hover:bg-white/10 p-3 rounded-lg transition"
+                >
+                  • Explain the role of switched_modulus in RunBenchConfig
+                </button>
+                <button 
+                  onClick={() => setQuestion('How does BuildCircuit compute final gates?')}
+                  className="block w-full text-left text-gray-300 hover:text-white hover:bg-white/10 p-3 rounded-lg transition"
+                >
+                  • How does BuildCircuit compute final gates?
+                </button>
+                <button 
+                  onClick={() => setQuestion('What cryptographic primitives are used in the diamond-io system?')}
+                  className="block w-full text-left text-gray-300 hover:text-white hover:bg-white/10 p-3 rounded-lg transition"
+                >
+                  • What cryptographic primitives are used in the diamond-io system?
+                </button>
+              </div>
+            </div>
+          )}
+
+          {chatHistory.map((msg, idx) => (
+            <div
+              key={idx}
+              className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
+            >
+              <div
+                className={`max-w-3xl rounded-2xl px-6 py-4 ${
+                  msg.role === 'user'
+                    ? 'bg-gradient-to-r from-blue-600 to-purple-600'
+                    : 'bg-white/10 backdrop-blur-lg border border-white/20'
+                }`}
+              >
+                <p className="text-xs font-semibold mb-2 opacity-70">
+                  {msg.role === 'user' ? 'You' : '🤖 DIO Expert'}
+                </p>
+                <p className="whitespace-pre-wrap leading-relaxed">{msg.content}</p>
+              </div>
+            </div>
+          ))}
+
+          {loading && (
+            <div className="flex justify-start">
+              <div className="max-w-3xl rounded-2xl px-6 py-4 bg-white/10 backdrop-blur-lg border border-white/20">
+                <p className="text-xs font-semibold mb-2 opacity-70">🤖 DIO Expert</p>
+                <div className="flex items-center space-x-2">
+                  <div className="w-2 h-2 bg-purple-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
+                  <div className="w-2 h-2 bg-purple-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
+                  <div className="w-2 h-2 bg-purple-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          <div ref={chatEndRef} />
+        </div>
+
+        <div className="p-6 border-t border-white/10 bg-gray-900/50 backdrop-blur-lg">
+          <form onSubmit={handleQuery} className="flex gap-3">
+            <textarea
+              value={question}
+              onChange={(e) => setQuestion(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault()
+                  handleQuery(e)
+                }
+              }}
+              placeholder={indexed ? "Ask about the codebase... (Shift+Enter for new line)" : "Indexing codebase, please wait..."}
+              className="flex-1 px-4 py-3 rounded-xl bg-white/10 border border-white/20 focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-500/50 resize-none"
+              rows={2}
+              disabled={!indexed || loading}
+            />
+            <button
+              type="submit"
+              disabled={loading || !indexed || !question.trim()}
+              className="px-8 bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-600 hover:to-blue-600 disabled:from-gray-600 disabled:to-gray-700 rounded-xl font-semibold transition-all transform hover:scale-105 disabled:scale-100 disabled:opacity-50"
+            >
+              {loading ? '...' : 'Send'}
+            </button>
+          </form>
         </div>
       </div>
     </div>

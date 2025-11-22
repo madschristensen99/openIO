@@ -1,18 +1,18 @@
 # 0G RAG Agent - Diamond IO Codebase Expert
 
-A Next.js application that implements a Retrieval-Augmented Generation (RAG) agent using 0G Storage to answer technical questions about the Diamond IO codebase.
+A Next.js application that implements a Retrieval-Augmented Generation (RAG) agent to answer technical questions about the Diamond IO codebase using AI-powered semantic search.
 
 ## Features
 
-- **Upload to 0G Storage**: Decentralized storage of the codebase XML file
-- **RAG Indexing**: Automatic chunking and embedding of code with OpenAI
-- **Semantic Search**: Find relevant code snippets using vector similarity
-- **AI Agent**: GPT-4 powered expert that answers questions using indexed knowledge
+- **Automatic Indexing**: Automatically indexes the local `repomix-output.xml` file on first load
+- **RAG Pipeline**: Chunking, embedding, and semantic search powered by OpenAI
+- **Chat Interface**: Clean, intuitive chat interface for querying the codebase
+- **AI Agent**: GPT-4 powered expert that provides accurate answers with context from the indexed code
+- **Optional 0G Storage**: Advanced users can optionally upload to decentralized 0G Storage
 
 ## Prerequisites
 
-1. **0G Wallet with Balance**: You need a private key with testnet tokens for gas fees
-2. **OpenAI API Key**: For embeddings and chat completions
+- **OpenAI API Key**: Required for embeddings (text-embedding-3-small) and chat completions (GPT-4)
 
 ## Setup
 
@@ -23,60 +23,44 @@ cd 0g
 npm install
 ```
 
-### 2. Configure Environment Variables
+### 2. Add Your OpenAI API Key
 
-Create a `.env` file (copy from `.env.example`):
+In Replit, go to the "Secrets" tab (🔒 icon in the left sidebar) and add:
 
-```bash
-cp .env.example .env
-```
+- **Key**: `OPENAI_API_KEY`
+- **Value**: Your OpenAI API key (starts with `sk-...`)
 
-Edit `.env` with your credentials:
+### 3. Run the Application
 
-```env
-# 0G Storage Configuration
-NEXT_PUBLIC_0G_EVM_RPC=https://evmrpc-testnet.0g.ai
-NEXT_PUBLIC_0G_INDEXER_RPC=https://indexer-storage-testnet-turbo.0g.ai
-ZG_PRIVATE_KEY=your_private_key_here
-
-# OpenAI Configuration
-OPENAI_API_KEY=sk-your-openai-key-here
-```
-
-### 3. Run the Development Server
-
-```bash
-npm run dev
-```
-
-The application will be available at `http://localhost:5000`
+The application is already running! It will automatically:
+1. Check if the codebase is already indexed
+2. If not, automatically index the `repomix-output.xml` file
+3. Open the chat interface when ready
 
 ## How It Works
 
-### Step 1: Upload to 0G Storage
+### Automatic Initialization
 
-Click "Upload XML File" to upload `repomix-output.xml` to 0G's decentralized storage network. This returns a Content ID (root hash) that uniquely identifies your file.
+When you first load the page, the application:
+1. Loads the local `repomix-output.xml` file containing the Diamond IO codebase
+2. Chunks the XML into 1200-character pieces with 200-character overlap
+3. Generates vector embeddings using OpenAI's `text-embedding-3-small` model
+4. Stores the indexed chunks locally for fast semantic search
+5. Displays "Ready • X chunks indexed" when complete
 
-### Step 2: Build RAG Index
+### Querying the Agent
 
-Click "Build RAG Index" to:
-- Download the file from 0G Storage
-- Chunk the XML into 1200-character pieces with 200-character overlap
-- Generate embeddings using OpenAI's `text-embedding-3-small`
-- Store the index locally for fast querying
-
-### Step 3 & 4: Query the Agent
-
-Ask technical questions about the codebase:
+Simply type your question in the chat interface! Examples:
 - "What does BenchCircuit::new_add_mul do?"
 - "Explain the role of switched_modulus in RunBenchConfig"
 - "How does BuildCircuit compute final gates?"
+- "What cryptographic primitives are used in the diamond-io system?"
 
 The agent will:
-1. Convert your question into an embedding
+1. Convert your question into a vector embedding
 2. Find the 5 most relevant code chunks using cosine similarity
 3. Send those chunks to GPT-4 as context
-4. Generate an accurate answer based on the indexed code
+4. Generate an accurate, grounded answer based on the actual codebase
 
 ## Architecture
 
