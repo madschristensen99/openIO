@@ -170,7 +170,9 @@ export default function CardEffect() {
     }
 
     startDrag(e: MouseEvent | Touch) {
-      e.preventDefault();
+      if ('preventDefault' in e) {
+        e.preventDefault();
+      }
 
       this.isDragging = true;
       this.isAnimating = false;
@@ -192,7 +194,9 @@ export default function CardEffect() {
 
     onDrag(e: MouseEvent | Touch) {
       if (!this.isDragging) return;
-      e.preventDefault();
+      if ('preventDefault' in e) {
+        e.preventDefault();
+      }
 
       const deltaX = e.clientX - this.lastMouseX;
       this.position += deltaX;
