@@ -32,24 +32,36 @@ The IO Coprocessor enables Solidity smart contracts to leverage Indistinguishabi
 
 ## Recent Changes (November 22, 2025)
 
-### 0G RAG Agent Setup
+### 0G RAG Agent with Storage Integration
 - Created Next.js 16 application with TypeScript and Tailwind CSS
 - Implemented automatic RAG indexing on first load
 - Built chat interface for querying the Diamond IO codebase
 - Integrated OpenAI for embeddings (text-embedding-3-small) and chat (GPT-4)
+- **Integrated 0G Storage for decentralized embedding storage and team sharing**:
+  - Automatic upload of computed embeddings to 0G Storage (when ZG_PRIVATE_KEY is set)
+  - Smart initialization: checks for EMBEDDINGS_0G_ROOT_HASH env var first
+  - Downloads pre-computed embeddings from 0G if hash is available
+  - Displays shareable root hash in UI for team collaboration
+  - Fallback to local indexing with helpful error messages
 - Configured semantic search with cosine similarity
 - Set up workflow for automatic server startup on port 5000
-- Added error handling and status displays for user feedback
+- Added comprehensive error handling and status displays for user feedback
 
 ## Project Architecture
 
 ### 0G RAG Agent (Active)
 - **Location**: `0g/`
-- **Technology**: Next.js 16, React 19, TypeScript, Tailwind CSS
+- **Technology**: Next.js 16, React 19, TypeScript, Tailwind CSS, 0G Storage SDK
 - **Port**: 5000
 - **Host**: 0.0.0.0 (configured for Replit proxy)
-- **Purpose**: AI-powered codebase query interface using RAG
-- **Features**: Automatic indexing, semantic search, GPT-4 answers
+- **Purpose**: AI-powered codebase query interface using RAG with decentralized storage
+- **Features**: 
+  - Automatic indexing from local XML file
+  - 0G Storage integration for embedding upload/download
+  - Team collaboration via shareable root hashes
+  - Semantic search with cosine similarity
+  - GPT-4 powered answers with source context
+  - Smart initialization (0G download → local index → 0G upload)
 
 ### Docusaurus Documentation
 - **Location**: `docs/`
@@ -99,9 +111,23 @@ The IO Coprocessor enables Solidity smart contracts to leverage Indistinguishabi
 
 ### Using the 0G RAG Agent (Current)
 The RAG agent runs automatically on port 5000. To use it:
+
+**First-time Setup:**
 1. Add your `OPENAI_API_KEY` in the Secrets tab
-2. Open the webview - the agent will automatically index the codebase
-3. Start asking questions about the Diamond IO codebase in the chat interface
+2. (Optional) Add `ZG_PRIVATE_KEY` for 0G Storage uploads
+3. Open the webview - the agent will automatically index the codebase
+4. If ZG_PRIVATE_KEY is set, embeddings are uploaded to 0G Storage
+5. Copy the displayed root hash to share with teammates
+
+**Team Members Using Shared Embeddings:**
+1. Add `OPENAI_API_KEY` in the Secrets tab (for queries only, not indexing)
+2. Add `EMBEDDINGS_0G_ROOT_HASH` with the shared root hash
+3. Open the webview - embeddings are downloaded instantly from 0G
+4. Start querying immediately (no re-indexing needed!)
+
+**Querying:**
+- Simply type questions about the Diamond IO codebase in the chat interface
+- Examples: "What does BenchCircuit::new_add_mul do?", "Explain switched_modulus in RunBenchConfig"
 
 ### Running the Documentation Site
 ```bash
