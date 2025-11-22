@@ -9,6 +9,7 @@ export default function RAGAgent() {
   const [indexLoading, setIndexLoading] = useState<boolean>(false)
   const [indexError, setIndexError] = useState<string>('')
   const [chunkCount, setChunkCount] = useState<number>(0)
+  const [zeroGRootHash, setZeroGRootHash] = useState<string>('')
   const [chatHistory, setChatHistory] = useState<Array<{ role: string; content: string }>>([])
   const chatEndRef = useRef<HTMLDivElement>(null)
 
@@ -28,6 +29,7 @@ export default function RAGAgent() {
       if (statusData.indexed) {
         setIndexed(true)
         setChunkCount(statusData.chunks || 0)
+        setZeroGRootHash(statusData.rootHash || '')
       } else {
         setIndexLoading(true)
         const indexRes = await fetch('/api/index-local', { method: 'POST' })
@@ -36,6 +38,9 @@ export default function RAGAgent() {
         if (indexData.success) {
           setIndexed(true)
           setChunkCount(indexData.chunks || 0)
+          if (indexData.rootHash) {
+            setZeroGRootHash(indexData.rootHash)
+          }
         } else {
           setIndexError(indexData.error || 'Failed to index codebase. Please check your OpenAI API key.')
         }
@@ -93,6 +98,20 @@ export default function RAGAgent() {
           <p className="text-gray-300 mt-2">
             {indexLoading ? 'Indexing codebase...' : indexed ? `Ready • ${chunkCount} chunks indexed` : indexError ? 'Initialization failed' : 'Initializing...'}
           </p>
+          {zeroGRootHash && zeroGRootHash !== 'local-only' && (
+            <div className="mt-3 p-3 bg-green-500/20 border border-green-500/50 rounded-lg text-sm">
+              <div className="flex items-start gap-2">
+                <div className="flex-shrink-0 text-green-400">📦</div>
+                <div className="flex-1">
+                  <p className="font-semibold text-green-200 mb-1">Stored on 0G Storage</p>
+                  <p className="text-green-100 text-xs font-mono break-all">{zeroGRootHash}</p>
+                  <p className="text-green-200/70 text-xs mt-2">
+                    Share this hash with teammates to instantly load the pre-computed embeddings!
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
           {indexError && (
             <div className="mt-3 p-3 bg-red-500/20 border border-red-500/50 rounded-lg text-sm text-red-200">
               <strong>Error:</strong> {indexError}
