@@ -7,7 +7,7 @@ import {VotingPowers} from "../src/symbiotic/VotingPowers.sol";
 import {KeyRegistry} from "../src/symbiotic/KeyRegistry.sol";
 import {Driver} from "../src/symbiotic/Driver.sol";
 import {Settlement} from "../src/symbiotic/Settlement.sol";
-import {SumTask} from "../src/SumTask.sol";
+import {HTTPTask} from "../src/HTTPTask.sol";
 import {MockERC20} from "./mocks/MockERC20.sol";
 import {BN254G2} from "./utils/BN254G2.sol";
 
@@ -78,7 +78,7 @@ contract MyRelayDeploy is RelayDeploy {
 
     // CREATE3 salts
     bytes11 public constant NETWORK_SALT = bytes11("Network");
-    bytes11 public constant SUM_TASK_SALT = bytes11("SumTask");
+    bytes11 public constant SUM_TASK_SALT = bytes11("HTTPTask");
     bytes11 public constant KEY_REGISTRY_SALT = bytes11("KeyRegistry");
     bytes11 public constant VOTING_POWER_PROVIDER_SALT = bytes11("VPProvider");
     bytes11 public constant SETTLEMENT_SALT = bytes11("Settlement");
@@ -310,7 +310,7 @@ contract MyRelayDeploy is RelayDeploy {
             deploySettlement({proxyOwner: getDeployerAddress(), isDeployerGuarded: false, salt: SETTLEMENT_SALT});
         vm.broadcast();
         address sumTask =
-            deployCreate3(bytes32(SUM_TASK_SALT), abi.encodePacked(type(SumTask).creationCode, abi.encode(settlement)));
+            deployCreate3(bytes32(SUM_TASK_SALT), abi.encodePacked(type(HTTPTask).creationCode, abi.encode(settlement)));
         config.set("sum_task", sumTask);
 
         fundOperators();

@@ -3,7 +3,7 @@ pragma solidity ^0.8.25;
 
 import {ISettlement} from "@symbioticfi/relay-contracts/src/interfaces/modules/settlement/ISettlement.sol";
 
-contract SumTask {
+contract HTTPTask {
     error AlreadyResponded();
     error InvalidQuorumSignature();
     error InvalidVerifyingEpoch();
@@ -16,15 +16,19 @@ contract SumTask {
     }
 
     struct Task {
-        uint256 numberA;
-        uint256 numberB;
+        string url;
+        string method;
+        string requestData;
         uint256 nonce;
         uint48 createdAt;
+        bool expectJsonResponse;
     }
 
     struct Response {
         uint48 answeredAt;
-        uint256 answer;
+        string responseData;
+        uint256 responseCode;
+        bool success;
     }
 
     event CreateTask(bytes32 indexed taskId, Task task);
@@ -61,16 +65,37 @@ contract SumTask {
         return TaskStatus.CREATED;
     }
 
-    function createTask(uint256 numberA, uint256 numberB) public returns (bytes32 taskId) {
+    function createTask(
+        string calldata url,
+        string calldata method,
+        string calldata requestData,
+        bool expectJsonResponse
+    ) public returns (bytes32 taskId) {
         uint256 nonce_ = nonce++;
-        Task memory task = Task({numberA: numberA, numberB: numberB, nonce: nonce_, createdAt: uint48(block.timestamp)});
-        taskId = keccak256(abi.encode(block.chainid, numberA, numberB, nonce_));
+        Task memory task = Task({
+            url: url,
+            method: method,
+            requestData: requestData,
+            nonce: nonce_,
+            createdAt: uint48(block.timestamp),
+            expectJsonResponse: expectJsonResponse
+        });
+        taskId = keccak256(
+            abi.encode(block.chainid, url, method, requestData, nonce_)
+        );
         tasks[taskId] = task;
 
         emit CreateTask(taskId, task);
     }
 
-    function respondTask(bytes32 taskId, uint256 result, uint48 epoch, bytes calldata proof) public {
+    function respondTask(
+        bytes32 taskId,
+        string calldata responseData,
+        uint256 responseCode,
+        bool success,
+        uint48 epoch,
+        bytes calldata proof
+    ) public {
         // check if the task is not responded yet
         if (responses[taskId].answeredAt > 0) {
             revert AlreadyResponded();
@@ -83,8 +108,10 @@ contract SumTask {
         }
 
         // verify the quorum signature
+        bytes memory encodedResult = abi.encode(taskId, responseData, responseCode, success);
+        bytes32 resultHash = keccak256(encodedResult);
         if (!settlement.verifyQuorumSigAt(
-                abi.encode(keccak256(abi.encode(taskId, result))),
+                abi.encode(resultHash),
                 settlement.getRequiredKeyTagFromValSetHeaderAt(epoch),
                 settlement.getQuorumThresholdFromValSetHeaderAt(epoch),
                 proof,
@@ -94,9 +121,29 @@ contract SumTask {
             revert InvalidQuorumSignature();
         }
 
-        Response memory response = Response({answeredAt: uint48(block.timestamp), answer: result});
+        Response memory response = Response({
+            answeredAt: uint48(block.timestamp),
+            responseData: responseData,
+            responseCode: responseCode,
+            success: success
+        });
         responses[taskId] = response;
 
         emit RespondTask(taskId, response);
+    }
+
+    // Utility function to create simple GET tasks
+    function createGETTask(
+        string calldata url
+    ) external returns (bytes32 taskId) {
+        return createTask(url, "GET", "", true);
+    }
+
+    // Utility function to create POST tasks
+    function createPOSTTask(
+        string calldata url,
+        string calldata jsonData
+    ) external returns (bytes32 taskId) {
+        return createTask(url, "POST", jsonData, true);
     }
 }
