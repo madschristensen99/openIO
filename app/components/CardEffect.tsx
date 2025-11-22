@@ -16,7 +16,7 @@ export default function CardEffect() {
   const particleCanvasRef = useRef<HTMLCanvasElement>(null);
   const scannerCanvasRef = useRef<HTMLCanvasElement>(null);
   
-  const animationFrameRef = useRef<number>();
+  const animationFrameRef = useRef<number | undefined>(undefined);
   
   const particleSystemRef = useRef<any>(null);
   const particleScannerRef = useRef<any>(null);
