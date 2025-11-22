@@ -4,3 +4,40 @@ expertMode = true
 
 [nix]
 channel = "stable-25_05"
+
+[workflows]
+runButton = "Project"
+
+[[workflows.workflow]]
+name = "Project"
+mode = "parallel"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "Docusaurus"
+
+[[workflows.workflow]]
+name = "Docusaurus"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "cd docs && npm start"
+waitForPort = 5000
+
+[workflows.workflow.metadata]
+outputType = "webview"
+
+[[ports]]
+localPort = 5000
+externalPort = 80
+
+[[ports]]
+localPort = 33005
+externalPort = 3000
+
+[deployment]
+deploymentTarget = "static"
+build = ["bash", "-c", "cd docs && npm run build"]
+publicDir = "docs/build"
