@@ -28,7 +28,7 @@ export default function AIChat() {
     scrollToBottom();
   }, [messages]);
 
-  const handleSend = () => {
+  const handleSend = async () => {
     if (!input.trim()) return;
 
     const userMessage: Message = {
@@ -41,38 +41,38 @@ export default function AIChat() {
     setInput('');
     setIsTyping(true);
 
-    // Simulate AI response
-    setTimeout(() => {
-      const assistantMessage: Message = {
+    try {
+      const response = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: input })
+      });
+      
+      const data = await response.json();
+      
+      if (data.success) {
+        const assistantMessage: Message = {
+          id: (Date.now() + 1).toString(),
+          role: 'assistant',
+          content: data.message
+        };
+        setMessages(prev => [...prev, assistantMessage]);
+      } else {
+        setMessages(prev => [...prev, {
+          id: (Date.now() + 1).toString(),
+          role: 'assistant',
+          content: 'Sorry, I encountered an error processing your request.'
+        }]);
+      }
+    } catch (error) {
+      setMessages(prev => [...prev, {
         id: (Date.now() + 1).toString(),
         role: 'assistant',
-        content: generateResponse(input)
-      };
-      setMessages(prev => [...prev, assistantMessage]);
-      setIsTyping(false);
-    }, 1000);
-  };
-
-  const generateResponse = (userInput: string): string => {
-    const lowerInput = userInput.toLowerCase();
-    
-    if (lowerInput.includes('seal') || lowerInput.includes('obfuscat')) {
-      return 'Sealed logic in openIO uses indistinguishability obfuscation to hide your contract\'s implementation while preserving functionality. The compiler transforms your code into an obfuscated form that can be executed but not reverse-engineered.';
+        content: 'Unable to connect to AI service. Please try again later.'
+      }]);
     }
     
-    if (lowerInput.includes('compile') || lowerInput.includes('build')) {
-      return 'To compile your contract, click the "Compile" button in the toolbar. The openIO compiler will seal your logic using iO, making it invisible while maintaining full functionality.';
-    }
-    
-    if (lowerInput.includes('deploy')) {
-      return 'After compilation, use the "Deploy" button to deploy your sealed contract to the openIO network. Once deployed, your contract\'s logic remains hidden from all observers.';
-    }
-    
-    if (lowerInput.includes('error') || lowerInput.includes('bug')) {
-      return 'If you\'re encountering errors, check the terminal output for compilation messages. Common issues include syntax errors or missing function definitions. Make sure your contract follows the openIO syntax.';
-    }
-    
-    return 'I can help you understand openIO concepts, debug your contracts, or explain how sealed logic works. Try asking about sealing, compilation, or deployment.';
+    setIsTyping(false);
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
