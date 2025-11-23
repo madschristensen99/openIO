@@ -1,9 +1,11 @@
 'use client';
 
 import { useMemo } from 'react';
-import { useAuth } from '../contexts/AuthContext';
 import Navbar from '../components/Navbar';
 import { models, Model } from '../data/models';
+
+// Hardcoded current user (in real app, this would come from auth)
+const currentUser = 'openio';
 
 // Hardcoded earnings data for user's models
 const modelEarnings: Record<string, { revenue: string; executions: string; lastPayout: string }> = {
@@ -17,28 +19,9 @@ const modelEarnings: Record<string, { revenue: string; executions: string; lastP
 };
 
 export default function ProfilePage() {
-  const { user } = useAuth();
-  const currentUser = user?.ens || user?.address || 'User';
-
-  if (!user) {
-    return (
-      <>
-        <Navbar />
-        <div className="profile-page">
-          <div className="profile-container">
-            <div className="profile-not-connected">
-              <h2>Connect Your Wallet</h2>
-              <p>Please connect your Web3 wallet to view your profile and manage your models.</p>
-            </div>
-          </div>
-        </div>
-      </>
-    );
-  }
-
   const userModels = useMemo(() => {
-    return models.filter(model => model.author === 'openio' && model.category !== 'operation');
-  }, [currentUser]);
+    return models.filter(model => model.author === currentUser && model.category !== 'operation');
+  }, []);
 
   const totalStats = useMemo(() => {
     let totalRevenue = 0;
@@ -70,15 +53,11 @@ export default function ProfilePage() {
             <div className="profile-left">
               <div className="profile-header">
                 <div className="profile-avatar">
-                  {user.ens ? user.ens.charAt(0).toUpperCase() : user.address.slice(-2).toUpperCase()}
+                  {currentUser[0].toUpperCase()}
                 </div>
                 <div className="profile-info">
-                  <h1 className="profile-name">{user.ens || `${user.address.slice(0, 6)}...${user.address.slice(-4)}`}</h1>
-                  <p className="profile-bio">Web3 developer & Privacy computation enthusiast</p>
-                  <p className="profile-address">{user.address}</p>
-                  {user.balance && (
-                    <p className="profile-balance">{parseFloat(user.balance).toFixed(4)} ETH</p>
-                  )}
+                  <h1 className="profile-name">{currentUser}</h1>
+                  <p className="profile-bio">Privacy computation developer</p>
                 </div>
               </div>
 
@@ -126,7 +105,7 @@ export default function ProfilePage() {
                     <span className="settings-arrow">→</span>
                   </button>
                   <div className="settings-divider"></div>
-                  <button className="settings-item logout" onClick={() => window.location.reload()}>
+                  <button className="settings-item logout">
                     <span className="settings-label">Logout</span>
                   </button>
                 </div>
