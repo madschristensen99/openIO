@@ -5,7 +5,7 @@ import { ReactFlow, applyNodeChanges, applyEdgeChanges, addEdge, Background, Con
 import '@xyflow/react/dist/style.css';
 import Navbar from '../../components/Navbar';
 import { models, getModelsByCategory, ModelCategory } from '../../data/models';
-import AIChat from '../components/AIChat';
+import AiChat from '../components/AIChat';
 import CodeEditor from '../components/CodeEditor';
 import FileExplorer from '../components/FileExplorer';
 
@@ -658,7 +658,7 @@ export default function BuilderPage() {
             </div>
             {isAISidebarOpen && (
               <div className="ai-sidebar-content">
-                <AIChat />
+                <AiChat page="builder" />
               </div>
             )}
           </div>
@@ -667,4 +667,3 @@ export default function BuilderPage() {
     </>
   );
 }
-

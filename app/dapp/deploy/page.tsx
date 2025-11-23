@@ -5,7 +5,7 @@ import Navbar from '../../components/Navbar';
 import FileExplorer from '../components/FileExplorer';
 import CodeEditor from '../components/CodeEditor';
 import Terminal from '../components/Terminal';
-import AIChat from '../components/AIChat';
+import AiChat from '../components/AIChat';
 
 export default function DeployPage() {
 
@@ -201,10 +201,9 @@ Build sealed, invisible applications with openIO.
             <Terminal output={terminalOutput} />
           </div>
           
-          <AIChat />
+          <AiChat page="deploy" />
         </div>
       </div>
     </>
   );
 }
-
