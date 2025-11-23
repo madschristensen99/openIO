@@ -37,9 +37,9 @@
     "x402-axios": "^0.7.2",
     "snarkjs": "^0.7.4",
     "circomlib": "^2.0.5",
-    "@noir-lang/noir_js": "^1.0.0-beta.1",
-    "@noir-lang/backend_barretenberg": "^1.0.0-beta.1",
-    "@risc0/ethereum-contracts": "^1.0.0",
+    "@noir-lang/noir_js": "0.33.0",
+    "@noir-lang/noirc_abi": "0.33.0",
+    "@noir-lang/acvm_js": "0.33.0",
     "uuid": "^11.0.3",
     "@types/uuid": "^10.0.0"
   },
