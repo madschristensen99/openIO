@@ -30,9 +30,9 @@ export async function uploadJSONTo0G(data: any, tempFileName: string = 'embeddin
     }
 
     const [tree, treeErr] = await file.merkleTree()
-    if (treeErr !== null) {
+    if (treeErr !== null || !tree) {
       await file.close()
-      throw new Error(`Failed to get merkle tree: ${treeErr}`)
+      throw new Error(`Failed to get merkle tree: ${treeErr ?? 'tree is null'}`)
     }
 
     const rootHash = tree.rootHash()
@@ -89,9 +89,9 @@ export async function uploadFileToZG(filePath: string): Promise<string> {
   }
 
   const [tree, treeErr] = await file.merkleTree()
-  if (treeErr !== null) {
+  if (treeErr !== null || !tree) {
     await file.close()
-    throw new Error(`Failed to get merkle tree: ${treeErr}`)
+    throw new Error(`Failed to get merkle tree: ${treeErr ?? 'tree is null'}`)
   }
 
   const rootHash = tree.rootHash()
