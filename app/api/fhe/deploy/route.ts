@@ -110,15 +110,11 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     const manifestContent = JSON.stringify(manifest);
     const manifestRootHash = await uploadTo0G(manifestContent);
 
-    // Upload individual files
+    // Upload individual files - handle base64 vs text content appropriately
     const fileHashes: Record<string, string> = {};
     
     for (const file of files) {
-      const data = file.name.includes('.bin') 
-        ? file.content  // base64 string for bin files
-        : file.content; // string for text files
-      
-      const fileHash = await uploadTo0G(data, file.name);
+      const fileHash = await uploadTo0G(file.content);
       fileHashes[file.name] = fileHash;
     }
 
