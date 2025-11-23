@@ -19,6 +19,11 @@ bun dev
 
 Open [http://localhost:3000](http://localhost:3000) to view the app. The page updates automatically as you edit `app/page.tsx`.
 
+## AI Assistant
+
+- `/api/ai-chat` proxies chat requests to the OpenIO assistant with RAG-backed context.
+- Render the sidebar with `<AiChat page="builder" | "deploy" />` to share the chat UI between dapp pages.
+
 ## X402 integration
 
 The SDK files under `src/x402` expect the following environment variables:

@@ -1,20 +1,24 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 
-interface Message {
+type ChatMessage = {
   id: string;
   role: 'user' | 'assistant';
   content: string;
+};
+
+interface AiChatProps {
+  page: 'builder' | 'deploy';
 }
 
-export default function AIChat() {
-  const [messages, setMessages] = useState<Message[]>([
+export default function AiChat({ page }: AiChatProps) {
+  const [messages, setMessages] = useState<ChatMessage[]>([
     {
       id: '1',
       role: 'assistant',
-      content: 'Hello! I\'m your openIO assistant. I can help you with sealed logic, iO concepts, and debugging your contracts. What would you like to know?'
-    }
+      content: "Hello! I'm your openIO assistant. Ask about workflows, deployments, or debugging your contracts.",
+    },
   ]);
   const [input, setInput] = useState('');
   const [isTyping, setIsTyping] = useState(false);
@@ -29,12 +33,13 @@ export default function AIChat() {
   }, [messages]);
 
   const handleSend = async () => {
-    if (!input.trim()) return;
+    const trimmedMessage = input.trim();
+    if (!trimmedMessage) return;
 
-    const userMessage: Message = {
+    const userMessage: ChatMessage = {
       id: Date.now().toString(),
       role: 'user',
-      content: input
+      content: trimmedMessage,
     };
 
     setMessages(prev => [...prev, userMessage]);
@@ -42,40 +47,42 @@ export default function AIChat() {
     setIsTyping(true);
 
     try {
-      const response = await fetch('/api/chat', {
+      const history = messages.map(({ role, content }) => ({ role, content }));
+      const response = await fetch('/api/ai-chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: input })
+        body: JSON.stringify({
+          message: trimmedMessage,
+          page,
+          history,
+        }),
       });
-      
+
       const data = await response.json();
-      
-      if (data.success) {
-        const assistantMessage: Message = {
-          id: (Date.now() + 1).toString(),
-          role: 'assistant',
-          content: data.message
-        };
-        setMessages(prev => [...prev, assistantMessage]);
-      } else {
-        setMessages(prev => [...prev, {
-          id: (Date.now() + 1).toString(),
-          role: 'assistant',
-          content: 'Sorry, I encountered an error processing your request.'
-        }]);
-      }
-    } catch (error) {
-      setMessages(prev => [...prev, {
+      const assistantMessage: ChatMessage = {
         id: (Date.now() + 1).toString(),
         role: 'assistant',
-        content: 'Unable to connect to AI service. Please try again later.'
-      }]);
+        content: typeof data?.assistantMessage === 'string'
+          ? data.assistantMessage
+          : 'Sorry, I encountered an error processing your request.',
+      };
+
+      setMessages(prev => [...prev, assistantMessage]);
+    } catch (error) {
+      setMessages(prev => [
+        ...prev,
+        {
+          id: (Date.now() + 1).toString(),
+          role: 'assistant',
+          content: 'Unable to connect to AI service. Please try again later.',
+        },
+      ]);
+    } finally {
+      setIsTyping(false);
     }
-    
-    setIsTyping(false);
   };
 
-  const handleKeyPress = (e: React.KeyboardEvent) => {
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       handleSend();
@@ -117,7 +124,7 @@ export default function AIChat() {
           className="chat-input"
           value={input}
           onChange={(e) => setInput(e.target.value)}
-          onKeyPress={handleKeyPress}
+          onKeyDown={handleKeyDown}
           placeholder="Ask about workflows, nodes, or get help..."
           rows={2}
         />
@@ -132,4 +139,3 @@ export default function AIChat() {
     </div>
   );
 }
-
