@@ -1,0 +1,1136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>x402proxy - Monetize Any API</title>
+    
+    <!-- Open Graph / Facebook -->
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://x402proxy.org/">
+    <meta property="og:title" content="x402proxy - Monetize Any API">
+    <meta property="og:description" content="Accept x402 payments, sell one-time API access, integrate with any facilitator. Set up in under 60 seconds.">
+    <meta property="og:image" content="https://x402proxy.org/images/x402proxy.png">
+    
+    <!-- Twitter -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:url" content="https://x402proxy.org/">
+    <meta name="twitter:title" content="x402proxy - Monetize Any API">
+    <meta name="twitter:description" content="Accept x402 payments, sell one-time API access, integrate with any facilitator. Set up in under 60 seconds.">
+    <meta name="twitter:image" content="https://x402proxy.org/images/x402proxy.png">
+    
+    <!-- Additional Meta -->
+    <meta name="description" content="Accept x402 payments, sell one-time API access, integrate with any facilitator. Set up in under 60 seconds.">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        :root {
+            --primary: #6aa94f;
+            --primary-dark: #5a8f42;
+            --primary-light: #7bc05f;
+            --accent: #6aa94f;
+            --dark: #0f172a;
+            --dark-light: #1e293b;
+            --text: #334155;
+            --text-light: #64748b;
+            --bg: #ffffff;
+            --bg-alt: #f8fafc;
+            --border: #e2e8f0;
+        }
+        
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            line-height: 1.6;
+            color: var(--text);
+            background: var(--bg);
+            overflow-x: hidden;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 20px;
+        }
+        
+        /* Animated Background Elements */
+        @keyframes float {
+            0%, 100% { transform: translateY(0px) rotate(0deg); }
+            50% { transform: translateY(-8px) rotate(2deg); }
+        }
+        
+        @keyframes gradient-shift {
+            0%, 100% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+        }
+        
+        @keyframes pulse-glow {
+            0%, 100% { box-shadow: 0 0 20px rgba(106, 169, 79, 0.3); }
+            50% { box-shadow: 0 0 40px rgba(106, 169, 79, 0.6); }
+        }
+        
+        /* Header */
+        header {
+            background: rgba(255, 255, 255, 0.8);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            padding: 1.25rem 0;
+            border-bottom: 1px solid var(--border);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            transition: all 0.3s ease;
+        }
+        
+        header.scrolled {
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+        }
+        
+        nav {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            position: relative;
+        }
+        
+        .logo {
+            font-size: 1.75rem;
+            font-weight: 800;
+            background: linear-gradient(135deg, var(--primary) 0%, var(--accent) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            letter-spacing: -0.5px;
+        }
+        
+        nav ul {
+            display: flex;
+            list-style: none;
+            gap: 2.5rem;
+        }
+        
+        nav a {
+            text-decoration: none;
+            color: var(--text);
+            font-weight: 500;
+            font-size: 0.95rem;
+            position: relative;
+            transition: color 0.3s ease;
+        }
+        
+        nav a::after {
+            content: '';
+            position: absolute;
+            bottom: -5px;
+            left: 0;
+            width: 0;
+            height: 2px;
+            background: linear-gradient(90deg, var(--primary), var(--accent));
+            transition: width 0.3s ease;
+        }
+        
+        nav a:hover {
+            color: var(--primary);
+        }
+        
+        nav a:hover::after {
+            width: 100%;
+        }
+        
+        /* Mobile Menu Toggle */
+        .menu-toggle {
+            display: none;
+            flex-direction: column;
+            gap: 5px;
+            background: none;
+            border: none;
+            cursor: pointer;
+            padding: 0.5rem;
+        }
+        
+        .menu-toggle span {
+            width: 25px;
+            height: 3px;
+            background: var(--dark);
+            border-radius: 2px;
+            transition: all 0.3s ease;
+        }
+        
+        .menu-toggle.active span:nth-child(1) {
+            transform: rotate(45deg) translate(8px, 8px);
+        }
+        
+        .menu-toggle.active span:nth-child(2) {
+            opacity: 0;
+        }
+        
+        .menu-toggle.active span:nth-child(3) {
+            transform: rotate(-45deg) translate(7px, -7px);
+        }
+        
+        /* Hero Section */
+        .hero {
+            text-align: center;
+            padding: 6rem 0;
+            background: white;
+            color: #4a5568;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .hero::before {
+            display: none;
+        }
+        
+        .hero .container {
+            position: relative;
+            z-index: 1;
+        }
+        
+        .hero h1 {
+            font-size: clamp(2.5rem, 5vw, 4rem);
+            margin-bottom: 1.5rem;
+            font-weight: 800;
+            letter-spacing: -1px;
+            line-height: 1.1;
+            color: #4a5568;
+        }
+        
+        .hero p {
+            font-size: clamp(1.1rem, 2vw, 1.5rem);
+            margin-bottom: 2.5rem;
+            font-weight: 400;
+            max-width: 700px;
+            margin-left: auto;
+            margin-right: auto;
+            color: #4a5568;
+        }
+        
+        .btn {
+            display: inline-block;
+            padding: 0.875rem 2rem;
+            text-decoration: none;
+            border-radius: 8px;
+            font-weight: 600;
+            font-size: 0.95rem;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            position: relative;
+            overflow: hidden;
+            border: 2px solid;
+            letter-spacing: 0.3px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+        }
+        
+        .btn::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.25), transparent);
+            transition: left 0.5s ease;
+        }
+        
+        .btn:hover::before {
+            left: 100%;
+        }
+        
+        .btn:hover {
+            transform: translateY(-2px) scale(1.02);
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+        }
+        
+        .btn:active {
+            transform: translateY(0) scale(1);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+        
+        /* Primary button - Green background */
+        .hero .btn {
+            background: var(--primary);
+            color: white;
+            border-color: var(--primary);
+        }
+        
+        .hero .btn:hover {
+            background: var(--primary-dark);
+            border-color: var(--primary-dark);
+        }
+        
+        /* Secondary button - White background */
+        .hero .btn-secondary {
+            background: white;
+            color: var(--primary);
+            border-color: rgba(106, 169, 79, 0.3);
+            margin-left: 1rem;
+        }
+        
+        .hero .btn-secondary:hover {
+            background: #f8fafc;
+            border-color: var(--primary);
+            color: var(--primary-dark);
+        }
+        
+        /* CTA section buttons (keep white text for green background) */
+        .cta .btn {
+            background: white;
+            color: var(--primary);
+            border-color: white;
+        }
+        
+        .cta .btn:hover {
+            background: #f8fafc;
+            border-color: #f8fafc;
+        }
+        
+        .cta .btn-secondary {
+            background: transparent;
+            color: white;
+            border-color: rgba(255, 255, 255, 0.6);
+            margin-left: 1rem;
+        }
+        
+        .cta .btn-secondary:hover {
+            background: rgba(255, 255, 255, 0.15);
+            border-color: white;
+        }
+        
+        /* Features Section */
+        .features {
+            padding: 5rem 0;
+        }
+        
+        /* Features Stacked Layout */
+        .features-stacked {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 1.5rem;
+            margin-top: 3rem;
+        }
+        
+        .feature-stacked-card {
+            display: flex;
+            align-items: flex-start;
+            gap: 1.5rem;
+            padding: 2rem;
+            background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
+            border-radius: 16px;
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            border: 1px solid var(--border);
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .feature-stacked-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 4px;
+            height: 100%;
+            background: linear-gradient(180deg, var(--primary), var(--accent));
+            transform: scaleY(0);
+            transition: transform 0.4s ease;
+        }
+        
+        .feature-stacked-card:hover {
+            background: white;
+            border-color: var(--primary);
+            box-shadow: 0 10px 40px rgba(106, 169, 79, 0.15);
+            transform: translateX(8px) translateY(-4px);
+        }
+        
+        .feature-stacked-card:hover::before {
+            transform: scaleY(1);
+        }
+        
+        .feature-stacked-icon {
+            font-size: 2.5rem;
+            flex-shrink: 0;
+            filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.1));
+            animation: float 5s ease-in-out infinite;
+        }
+        
+        .feature-stacked-card:nth-child(even) .feature-stacked-icon {
+            animation-delay: 0.5s;
+        }
+        
+        .feature-stacked-content h3 {
+            margin-bottom: 0.5rem;
+            color: #4a5568;
+            font-size: 1.25rem;
+            font-weight: 700;
+        }
+        
+        .feature-stacked-content p {
+            color: var(--text-light);
+            font-size: 0.95rem;
+            line-height: 1.6;
+        }
+        
+        /* Use Cases Horizontal Layout */
+        .use-cases-container {
+            display: flex;
+            gap: 1.5rem;
+            overflow-x: auto;
+            overflow-y: hidden;
+            padding: 2rem 0;
+            scroll-behavior: smooth;
+            scrollbar-width: thin;
+            scrollbar-color: var(--primary) var(--border);
+            padding-bottom: 1rem;
+        }
+        
+        .use-cases-container::-webkit-scrollbar {
+            height: 8px;
+            width: 8px;
+        }
+        
+        .use-cases-container::-webkit-scrollbar-track {
+            background: var(--border);
+            border-radius: 10px;
+        }
+        
+        .use-cases-container::-webkit-scrollbar-thumb {
+            background: linear-gradient(90deg, var(--primary), var(--accent));
+            border-radius: 10px;
+        }
+        
+        .use-cases-container::-webkit-scrollbar-corner {
+            background: transparent;
+        }
+        
+        .use-case-card {
+            min-width: 300px;
+            max-width: 340px;
+            padding: 2.5rem;
+            background: white;
+            border-radius: 20px;
+            border: 1px solid var(--border);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.06);
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            flex-shrink: 0;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .use-case-card::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: linear-gradient(90deg, var(--primary), var(--accent));
+            transform: scaleX(0);
+            transition: transform 0.4s ease;
+        }
+        
+        .use-case-card:hover {
+            transform: translateY(-12px) scale(1.02);
+            box-shadow: 0 20px 40px rgba(106, 169, 79, 0.2);
+            border-color: var(--primary);
+        }
+        
+        .use-case-card:hover::after {
+            transform: scaleX(1);
+        }
+        
+        .use-case-icon {
+            font-size: 3rem;
+            margin-bottom: 1.25rem;
+            display: inline-block;
+            animation: float 6s ease-in-out infinite;
+        }
+        
+        .use-case-card h3 {
+            margin-bottom: 1rem;
+            color: #4a5568;
+            font-size: 1.3rem;
+            font-weight: 700;
+        }
+        
+        .use-case-card p {
+            color: var(--text-light);
+            font-size: 0.95rem;
+            line-height: 1.7;
+        }
+        
+        /* Section Headers */
+        h2 {
+            text-align: center;
+            font-size: clamp(2rem, 4vw, 3rem);
+            margin-bottom: 1rem;
+            color: #4a5568;
+            font-weight: 800;
+            letter-spacing: -1px;
+            background: linear-gradient(135deg, #4a5568 0%, var(--text) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        
+        .section-subtitle {
+            text-align: center;
+            font-size: 1.2rem;
+            color: var(--text-light);
+            margin-bottom: 3rem;
+            font-weight: 400;
+        }
+        
+        /* How It Works */
+        .how-it-works {
+            padding: 5rem 0;
+            background: linear-gradient(180deg, var(--bg-alt) 0%, white 100%);
+            position: relative;
+        }
+        
+        .steps {
+            display: flex;
+            justify-content: space-around;
+            flex-wrap: wrap;
+            gap: 2rem;
+            margin-top: 4rem;
+            position: relative;
+        }
+        
+        .steps::before {
+            content: '';
+            position: absolute;
+            top: 60px;
+            left: 10%;
+            right: 10%;
+            height: 2px;
+            background: linear-gradient(90deg, transparent, var(--primary), transparent);
+            z-index: 0;
+        }
+        
+        .step {
+            flex: 1;
+            min-width: 250px;
+            text-align: center;
+            padding: 2.5rem 2rem;
+            position: relative;
+            z-index: 1;
+        }
+        
+        .step-number {
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, var(--primary) 0%, var(--accent) 100%);
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 1.5rem;
+            font-size: 2.5rem;
+            font-weight: 800;
+            box-shadow: 0 8px 20px rgba(106, 169, 79, 0.3);
+            animation: pulse-glow 3s ease-in-out infinite;
+        }
+        
+        .step h3 {
+            margin-bottom: 1rem;
+            color: #4a5568;
+            font-size: 1.4rem;
+            font-weight: 700;
+        }
+        
+        .step p {
+            color: var(--text-light);
+            font-size: 1rem;
+        }
+        
+        /* CTA Section */
+        .cta {
+            padding: 5rem 0;
+            text-align: center;
+            background: linear-gradient(135deg, #6aa94f 0%, #5a8f42 50%, #4a7a35 100%);
+            background-size: 200% 200%;
+            animation: gradient-shift 8s ease infinite;
+            color: white;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .cta::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            right: -20%;
+            width: 600px;
+            height: 600px;
+            background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 70%);
+            border-radius: 50%;
+            animation: float 15s ease-in-out infinite;
+        }
+        
+        .cta .container {
+            position: relative;
+            z-index: 1;
+        }
+        
+        .cta h2 {
+            color: white;
+            margin-bottom: 1rem;
+            -webkit-text-fill-color: white;
+            background: none;
+        }
+        
+        .cta p {
+            font-size: 1.3rem;
+            margin-bottom: 2.5rem;
+            opacity: 0.95;
+            font-weight: 400;
+        }
+        
+        /* Footer */
+        footer {
+            background: var(--dark);
+            color: white;
+            text-align: center;
+            padding: 3rem 0;
+            position: relative;
+        }
+        
+        footer::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 1px;
+            background: linear-gradient(90deg, transparent, var(--primary), transparent);
+        }
+        
+        footer a {
+            color: var(--primary-light);
+            text-decoration: none;
+            font-weight: 500;
+            transition: color 0.3s ease;
+        }
+        
+        footer a:hover {
+            color: var(--primary);
+        }
+        
+        .code-block {
+            background: var(--dark);
+            color: #d4d4d4;
+            border-radius: 12px;
+            overflow: hidden;
+            margin: 2rem auto;
+            max-width: 800px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+            position: relative;
+        }
+        
+        .terminal-header {
+            background: #2d2d2d;
+            padding: 0.75rem 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        
+        .terminal-buttons {
+            display: flex;
+            gap: 0.5rem;
+        }
+        
+        .terminal-button {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            border: none;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            position: relative;
+        }
+        
+        .terminal-button:hover {
+            opacity: 0.8;
+            transform: scale(1.15);
+        }
+        
+        .terminal-button:active {
+            transform: scale(0.95);
+            opacity: 0.6;
+        }
+        
+        .terminal-button.close {
+            background: #ff5f56;
+        }
+        
+        .terminal-button.close:hover {
+            background: #ff3b30;
+        }
+        
+        .terminal-button.minimize {
+            background: #ffbd2e;
+        }
+        
+        .terminal-button.minimize:hover {
+            background: #ffa500;
+        }
+        
+        .terminal-button.expand {
+            background: #27c93f;
+        }
+        
+        .terminal-button.expand:hover {
+            background: #1db954;
+        }
+        
+        .terminal-title {
+            flex: 1;
+            text-align: center;
+            font-size: 0.75rem;
+            color: rgba(255, 255, 255, 0.6);
+            font-family: 'Inter', sans-serif;
+            font-weight: 500;
+            letter-spacing: 0.5px;
+        }
+        
+        .code-block-content {
+            padding: 1.5rem 2rem;
+            font-family: 'Courier New', monospace;
+            font-size: 0.95rem;
+            overflow-x: auto;
+            line-height: 1.6;
+            text-align: left;
+        }
+        
+        .highlight {
+            color: #4ec9b0;
+        }
+        
+        @media (max-width: 768px) {
+            .hero {
+                padding: 4rem 0;
+            }
+            
+            .hero h1 {
+                font-size: 2rem;
+            }
+            
+            .hero p {
+                font-size: 1rem;
+            }
+            
+            .btn-secondary {
+                margin-left: 0;
+                margin-top: 1rem;
+                display: block;
+            }
+            
+            .menu-toggle {
+                display: flex;
+            }
+            
+            nav ul {
+                position: absolute;
+                top: 100%;
+                left: 0;
+                right: 0;
+                background: rgba(255, 255, 255, 0.95);
+                backdrop-filter: blur(20px);
+                flex-direction: column;
+                gap: 0;
+                padding: 1rem 0;
+                border-top: 1px solid var(--border);
+                max-height: 0;
+                overflow: hidden;
+                transition: max-height 0.3s ease;
+                z-index: 1000;
+            }
+            
+            nav ul.active {
+                max-height: 400px;
+            }
+            
+            nav ul li {
+                width: 100%;
+                padding: 0.75rem 2rem;
+                border-bottom: 1px solid var(--border);
+            }
+            
+            nav ul li:last-child {
+                border-bottom: none;
+            }
+            
+            nav a {
+                display: block;
+                width: 100%;
+            }
+            
+            .steps {
+                flex-direction: column;
+            }
+            
+            .steps::before {
+                display: none;
+            }
+            
+            .use-case-card {
+                min-width: 280px;
+            }
+            
+            .features-stacked {
+                grid-template-columns: 1fr;
+            }
+            
+            .feature-stacked-card {
+                flex-direction: column;
+                align-items: center;
+                text-align: center;
+            }
+            
+            .feature-stacked-card:hover {
+                transform: translateY(-4px);
+            }
+            
+            .code-block-content {
+                padding: 1rem;
+                font-size: 0.85rem;
+            }
+            
+            .terminal-header {
+                padding: 0.5rem 0.75rem;
+            }
+            
+            .terminal-button {
+                width: 10px;
+                height: 10px;
+            }
+            
+            .terminal-title {
+                font-size: 0.7rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Header -->
+    <header>
+        <nav class="container">
+            <div class="logo">x402proxy</div>
+            <button class="menu-toggle" aria-label="Toggle menu">
+                <span></span>
+                <span></span>
+                <span></span>
+            </button>
+            <ul id="nav-menu">
+                <li><a href="#features">Features</a></li>
+                <li><a href="#use-cases">Use Cases</a></li>
+                <li><a href="#how-it-works">How It Works</a></li>
+                <li><a href="#get-started">Get Started</a></li>
+                <li><a href="https://github.com/zachalam/x402proxy">GitHub</a></li>
+            </ul>
+        </nav>
+    </header>
+
+    <!-- Hero Section -->
+    <section class="hero">
+        <div class="container">
+            <h1>Monetize Your API</h1>
+            <p>Accept x402 payments, sell one-time API access, integrate with any facilitator</p>
+            <a href="x402-quickstart.pdf" target="_blank" class="btn">📑 x402 PDF</a>
+            <a href="https://github.com/zachalam/x402proxy" class="btn btn-secondary">Try on GitHub</a>
+        </div>
+    </section>
+
+        <!-- Use Cases -->
+        <section id="use-cases" class="features" style="background: #f8f9fa;">
+            <div class="container">
+                <h2>Use Cases</h2>
+                <p class="section-subtitle">x402proxy is perfect for a wide range of API & MCP monetization needs</p>
+                
+                <div class="use-cases-container">
+                    <div class="use-case-card">
+                        <div class="use-case-icon">🤖</div>
+                        <h3>AI API Monetization</h3>
+                        <p>Charge per AI generation request - images, text, or audio. Perfect for wrapping GPT, DALL-E, or Stable Diffusion APIs.</p>
+                    </div>
+                    
+                    <div class="use-case-card">
+                        <div class="use-case-icon">📊</div>
+                        <h3>Data API Access</h3>
+                        <p>Monetize access to valuable datasets, financial data, or proprietary information with one-time payments.</p>
+                    </div>
+                    
+                    <div class="use-case-card">
+                        <div class="use-case-icon">🎮</div>
+                        <h3>Gaming APIs</h3>
+                        <p>Sell access to game assets, leaderboards, or player data. Charge per API call or data export.</p>
+                    </div>
+                    
+                    <div class="use-case-card">
+                        <div class="use-case-icon">🖼️</div>
+                        <h3>Media Streaming</h3>
+                        <p>Paywall video, image, or audio content. Sell one-time access to premium media collections.</p>
+                    </div>
+                    
+                    <div class="use-case-card">
+                        <div class="use-case-icon">🔐</div>
+                        <h3>Premium Tool Access</h3>
+                        <p>Wrap developer tools, calculators, or utilities with payment. Charge for API-based service usage.</p>
+                    </div>
+                    
+                    <div class="use-case-card">
+                        <div class="use-case-icon">🌐</div>
+                        <h3>Third-Party GET APIs</h3>
+                        <p>Wrap any public API endpoint. Add your pricing layer to popular APIs and split revenue.</p>
+                    </div>
+                    
+                    <div class="use-case-card">
+                        <div class="use-case-icon">📝</div>
+                        <h3>Document Generation</h3>
+                        <p>Charge per document creation - invoices, reports, PDFs, or custom formatted documents.</p>
+                    </div>
+                    
+                    <div class="use-case-card">
+                        <div class="use-case-icon">🗺️</div>
+                        <h3>Location Services</h3>
+                        <p>Monetize geocoding, mapping, or location-based data APIs with per-request pricing.</p>
+                    </div>
+                    
+                    <div class="use-case-card">
+                        <div class="use-case-icon">💼</div>
+                        <h3>White-Label Services</h3>
+                        <p>Build your own SaaS layer on top of existing APIs. No development needed, just configuration.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+    
+    <!-- Features Section -->
+    <section id="features" class="features">
+        <div class="container">
+            <h2>Why Use x402proxy?</h2>
+            <p class="section-subtitle">Everything you need to monetize your API</p>
+            
+            <div class="features-stacked">
+                <div class="feature-stacked-card">
+                    <div class="feature-stacked-icon">⚡</div>
+                    <div class="feature-stacked-content">
+                        <h3>60 Second Setup</h3>
+                        <p>Two commands. No complex configuration. Start accepting payments immediately.</p>
+                    </div>
+                </div>
+                
+                <div class="feature-stacked-card">
+                    <div class="feature-stacked-icon">🌐</div>
+                    <div class="feature-stacked-content">
+                        <h3>Multi-Chain Support</h3>
+                        <p>Works with Ethereum, Base, Solana, and any EVM-compatible blockchain.</p>
+                    </div>
+                </div>
+                
+                <div class="feature-stacked-card">
+                    <div class="feature-stacked-icon">💰</div>
+                    <div class="feature-stacked-content">
+                        <h3>Direct Payments</h3>
+                        <p>Receive money straight to your crypto wallet. No middleman, no delays.</p>
+                    </div>
+                </div>
+                
+                <div class="feature-stacked-card">
+                    <div class="feature-stacked-icon">🏗️</div>
+                    <div class="feature-stacked-content">
+                        <h3>Flexible Pricing</h3>
+                        <p>Set global or per-route pricing. Control exactly what customers pay.</p>
+                    </div>
+                </div>
+                
+                <div class="feature-stacked-card">
+                    <div class="feature-stacked-icon">🔌</div>
+                    <div class="feature-stacked-content">
+                        <h3>Plug & Play</h3>
+                        <p>Connects to any x402 facilitator. No vendor lock-in.</p>
+                    </div>
+                </div>
+                
+                <div class="feature-stacked-card">
+                    <div class="feature-stacked-icon">🛡️</div>
+                    <div class="feature-stacked-content">
+                        <h3>Production Ready</h3>
+                        <p>Dockerized, multi-architecture support, runs as non-root user.</p>
+                    </div>
+                </div>
+                
+                <div class="feature-stacked-card">
+                    <div class="feature-stacked-icon">📊</div>
+                    <div class="feature-stacked-content">
+                        <h3>Monetize Existing APIs</h3>
+                        <p>Wrap any existing API with payment middleware. Zero code changes.</p>
+                    </div>
+                </div>
+                
+                <div class="feature-stacked-card">
+                    <div class="feature-stacked-icon">🚀</div>
+                    <div class="feature-stacked-content">
+                        <h3>Built-in Proxy</h3>
+                        <p>Automatically forwards requests after payment. Works with any backend API.</p>
+                    </div>
+                </div>
+                
+
+            </div>
+        </div>
+    </section>
+
+
+    <!-- How It Works -->
+    <section id="how-it-works" class="how-it-works">
+        <div class="container">
+            <h2>How It Works</h2>
+            <p class="section-subtitle">Simple architecture, powerful results</p>
+            
+            <div class="steps">
+                <div class="step">
+                    <div class="step-number">1</div>
+                    <h3>Set your rules</h3>
+                    <p>A single config file lets you set pricing and rules to monetize your API.</p>
+                </div>
+                
+                <div class="step">
+                    <div class="step-number">2</div>
+                    <h3>Run x402proxy</h3>
+                    <p>Set your config and start accepting payments immediately</p>
+                </div>
+                
+                <div class="step">
+                    <div class="step-number">3</div>
+                    <h3>Start Monetizing</h3>
+                    <p>End users pay per use to access your API functionality</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Get Started -->
+    <section id="get-started" class="cta">
+        <div class="container">
+            <h2>Ready to Get Started?</h2>
+            <p>Set up x402proxy in under 60 seconds</p>
+            
+            <div class="code-block">
+                <div class="terminal-header">
+                    <div class="terminal-buttons">
+                        <button class="terminal-button close" aria-label="Close"></button>
+                        <button class="terminal-button minimize" aria-label="Minimize"></button>
+                        <button class="terminal-button expand" aria-label="Expand"></button>
+                    </div>
+                    <div class="terminal-title">Terminal</div>
+                </div>
+                <div class="code-block-content">
+curl -o custom-config.json https://raw.githubusercontent.com/zachalam/x402proxy/refs/heads/main/custom-config.json<br><br>
+
+docker run -p 8080:8080 \<br>
+&nbsp;&nbsp;-v $(pwd)/custom-config.json:/app/config.json:ro \<br>
+&nbsp;&nbsp;ghcr.io/zachalam/x402proxy:latest
+                </div>
+            </div>
+            
+            <a href="https://github.com/zachalam/x402proxy" class="btn">View Full Documentation</a>
+            <a href="https://github.com/zachalam/x402proxy" class="btn btn-secondary">Star on GitHub</a>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer>
+        <div class="container">
+            <p>&copy; 2025 x402proxy. Licensed under <a href="https://github.com/zachalam/x402proxy/blob/main/LICENSE">ISC</a>.</p>
+            <p>Built with ❤️ for the x402 ecosystem</p>
+        </div>
+    </footer>
+    
+    <script>
+        // Mobile menu toggle
+        const menuToggle = document.querySelector('.menu-toggle');
+        const navMenu = document.getElementById('nav-menu');
+        const header = document.querySelector('header');
+        
+        if (menuToggle) {
+            menuToggle.addEventListener('click', () => {
+                menuToggle.classList.toggle('active');
+                navMenu.classList.toggle('active');
+            });
+            
+            // Close menu when clicking on a link
+            const navLinks = navMenu.querySelectorAll('a');
+            navLinks.forEach(link => {
+                link.addEventListener('click', () => {
+                    menuToggle.classList.remove('active');
+                    navMenu.classList.remove('active');
+                });
+            });
+        }
+        
+        // Header scroll effect
+        let lastScroll = 0;
+        window.addEventListener('scroll', () => {
+            const currentScroll = window.pageYOffset;
+            
+            if (currentScroll > 50) {
+                header.classList.add('scrolled');
+            } else {
+                header.classList.remove('scrolled');
+            }
+            
+            lastScroll = currentScroll;
+        });
+        
+        // Smooth scroll for anchor links
+        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+            anchor.addEventListener('click', function (e) {
+                const href = this.getAttribute('href');
+                if (href !== '#' && href.length > 1) {
+                    e.preventDefault();
+                    const target = document.querySelector(href);
+                    if (target) {
+                        target.scrollIntoView({
+                            behavior: 'smooth',
+                            block: 'start'
+                        });
+                    }
+                }
+            });
+        });
+        
+        // Intersection Observer for fade-in animations
+        const observerOptions = {
+            threshold: 0.1,
+            rootMargin: '0px 0px -50px 0px'
+        };
+        
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    entry.target.style.opacity = '1';
+                    entry.target.style.transform = 'translateY(0)';
+                }
+            });
+        }, observerOptions);
+        
+        // Observe feature cards and use case cards
+        document.querySelectorAll('.feature-stacked-card, .use-case-card, .step').forEach(el => {
+            el.style.opacity = '0';
+            el.style.transform = 'translateY(20px)';
+            el.style.transition = 'opacity 0.6s ease, transform 0.6s ease';
+            observer.observe(el);
+        });
+    </script>
+</body>
+</html>
+
