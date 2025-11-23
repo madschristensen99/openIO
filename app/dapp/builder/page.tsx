@@ -57,6 +57,7 @@ export default function BuilderPage() {
   const [selectedOp, setSelectedOp] = useState('');
   const [selectedCustom, setSelectedCustom] = useState('');
   const [isAISidebarOpen, setIsAISidebarOpen] = useState(true);
+  const [isFHEModalOpen, setIsFHEModalOpen] = useState(false);
   
   // Code Mode state
   const [customModules, setCustomModules] = useState<CustomModule[]>([]);
