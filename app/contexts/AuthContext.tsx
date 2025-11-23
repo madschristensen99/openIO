@@ -3,6 +3,13 @@
 import { createContext, useContext, useState, useEffect } from 'react';
 import { ethers } from 'ethers';
 
+// Type definitions for window.ethereum
+declare global {
+  interface Window {
+    ethereum?: any;
+  }
+}
+
 interface AuthUser {
   address: string;
   ens?: string;
