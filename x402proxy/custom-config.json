@@ -1,0 +1,20 @@
+{
+  "facilitatorUrl": "https://x402-amoy.polygon.technology/",
+  "network": "polygon-amoy",
+  "paymentAddress": "0xc3A433C40D65B06fc1AECdE051983DA257c1404e",
+  "defaultPrice": "$1",
+  "protectedEndpoints": {
+    "POST /nostream": {
+      "price": "$0.09",
+      "forwardTo": "https://anthropology-chairs-mtv-eco.trycloudflare.com/get-data"
+    },
+    "POST /benchmark-dummy": {
+      "price": "$0.09",
+      "forwardTo": "http://34.46.119.33:3000/run/dummy"
+    },
+    "POST /benchmark": {
+      "price": "$0.21",
+      "forwardTo": "http://34.46.119.33:3000/run/real"
+    }
+  }
+}
