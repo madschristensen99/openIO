@@ -6,7 +6,7 @@ import { tmpdir } from 'os';
 
 export async function POST(request: NextRequest) {
   try {
-    const { keyName, public }: { keyName?: string; public?: boolean } = await request.json();
+    const { keyName, public: isPublic }: { keyName?: string; public?: boolean } = await request.json();
     
     const name = keyName || `fhe-keys-${Date.now()}`;
     
@@ -52,7 +52,7 @@ export async function POST(request: NextRequest) {
             };
 
             // Clean up the temp directory if not public
-            if (!public) {
+            if (!isPublic) {
               await fs.rm(tempDir, { recursive: true, force: true });
             }
 

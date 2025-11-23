@@ -128,7 +128,7 @@ export async function POST(request: NextRequest) {
       keyName,
       manifestRootHash,
       fileHashes,
-      0GStorage: {
+      zgStorage: {
         rootHash: manifestRootHash,
         filesUploaded: Object.keys(fileHashes),
         uploadSuccess: true,
