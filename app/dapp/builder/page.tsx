@@ -61,11 +61,9 @@ export default function BuilderPage() {
   // Code Mode state
   const [customModules, setCustomModules] = useState<CustomModule[]>([]);
   const [files, setFiles] = useState<string[]>([
-    'verifier.circom',
-    'arbitrage.circom',
-    'swap.circom',
-    'cairo_verifier.cairo',
-    'cairo_arbitrage.cairo'
+    'module1.io',
+    'module2.io',
+    'module3.io'
   ]);
   const [selectedFile, setSelectedFile] = useState<string | null>(null);
   const [currentFileContent, setCurrentFileContent] = useState<string>('');
@@ -175,7 +173,7 @@ export default function BuilderPage() {
   // Code Mode functions
   const handleCreateFile = useCallback(() => {
     if (!newFileName.trim()) return;
-    const filename = newFileName.endsWith('.circom') || newFileName.endsWith('.cairo') ? newFileName : `${newFileName}.circom`;
+    const filename = newFileName.endsWith('.io') ? newFileName : `${newFileName}.io`;
     
     if (files.includes(filename)) {
       alert('File already exists!');
