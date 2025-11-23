@@ -31,5 +31,5 @@
     ".next/dev/types/**/*.ts",
     "**/*.mts"
   ],
-  "exclude": ["node_modules", "0g/**/*", "docs/**/*", "symbiotic/**/*", "exec/**/*"]
+  "exclude": ["node_modules", "0g/**/*", "docs/**/*", "symbiotic/**/*", "exec/**/*", "x402-client/**/*", "x402proxy/**/*"]
 }
