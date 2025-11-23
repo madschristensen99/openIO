@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { uploadFileToZG as uploadTo0G } from '../../../0g/lib/storage';
+import { uploadFileToZG as uploadTo0G } from '../../../../0g/lib/storage';
 import { randomUUID } from 'crypto';
 
-export async function POST(request: NextRequest) {
+export async function POST(request: NextRequest): Promise<NextResponse> {
   try {
     const { 
       keys, 
@@ -106,19 +106,19 @@ export async function POST(request: NextRequest) {
       }
     };
 
-    // Upload manifest
-    const manifestData = new Blob([JSON.stringify(manifest)], { type: 'application/json' });
-    const manifestRootHash = await uploadTo0G(manifestData);
+    // Save manifest to temp file and upload
+    const manifestContent = JSON.stringify(manifest);
+    const manifestRootHash = await uploadTo0G(manifestContent);
 
     // Upload individual files
-    const fileHashes = {};
+    const fileHashes: Record<string, string> = {};
     
     for (const file of files) {
       const data = file.name.includes('.bin') 
-        ? new Blob([Buffer.from(file.content, 'base64')]) 
-        : new Blob([file.content], { type: file.type });
+        ? file.content  // base64 string for bin files
+        : file.content; // string for text files
       
-      const fileHash = await uploadTo0G(data);
+      const fileHash = await uploadTo0G(data, file.name);
       fileHashes[file.name] = fileHash;
     }
 
