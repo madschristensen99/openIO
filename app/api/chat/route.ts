@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 export async function POST(request: NextRequest) {
-  let message: string;
+  let message: string = '';
   
   try {
     const body = await request.json();
-    message = body.message;
+    message = body.message || '';
     
     // Real OpenAI integration (requires OPENAI_API_KEY)
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
