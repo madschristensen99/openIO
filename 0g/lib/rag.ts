@@ -2,7 +2,7 @@ import OpenAI from 'openai'
 import * as fs from 'fs'
 
 const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
+  apiKey: process.env.OPENAI_API_KEY || 'missing-key',
 })
 
 export interface Chunk {
@@ -25,6 +25,11 @@ export async function chunkDocument(content: string, chunkSize: number = 1200, o
 }
 
 export async function createEmbeddings(texts: string[]): Promise<number[][]> {
+  if (!process.env.OPENAI_API_KEY) {
+    // Return empty embeddings when API key is missing (for build)
+    return texts.map(() => Array(1536).fill(0))
+  }
+  
   const BATCH_SIZE = 100
   const allEmbeddings: number[][] = []
 
@@ -62,6 +67,11 @@ function cosineSimilarity(a: number[], b: number[]): number {
 }
 
 export async function semanticSearch(query: string, chunks: Chunk[], topK: number = 5): Promise<Chunk[]> {
+  if (!process.env.OPENAI_API_KEY) {
+    // Return empty results when API key is missing
+    return []
+  }
+  
   const queryEmbedding = await createEmbeddings([query])
   const queryVec = queryEmbedding[0]
 
@@ -79,6 +89,10 @@ export async function generateAnswer(
   context: string[],
   chatHistory: Array<{ role: string; content: string }> = []
 ): Promise<string> {
+  if (!process.env.OPENAI_API_KEY) {
+    return "OpenAI API key is required. Please set the OPENAI_API_KEY environment variable."
+  }
+  
   const contextText = context.join('\n\n---\n\n')
   
   const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [
