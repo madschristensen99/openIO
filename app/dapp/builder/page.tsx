@@ -99,19 +99,73 @@ export default function BuilderPage() {
   );
   
   const onConnect = useCallback(
-    (params: any) => setEdges((eds) => addEdge(params, eds)),
-    []
+    (params: any) => {
+      const sourceNode = nodes.find(n => n.id === params.source);
+      const category = sourceNode?.data?.category || 'custom';
+      
+      const categoryColors = {
+        'zk': '#667eea',
+        'fhe': '#764ba2', 
+        'io': '#f093fb',
+        'operation': '#4facfe',
+        'custom': '#a8edea'
+      };
+
+      const color = categoryColors[category as keyof typeof categoryColors] || categoryColors.custom;
+      
+      const newEdge = {
+        ...params,
+        type: 'smoothstep',
+        style: {
+          stroke: color,
+          strokeWidth: 3,
+          filter: `drop-shadow(0 2px 8px ${color}60)`
+        },
+        animated: true,
+        animationSpeed: 1.2,
+      };
+      
+      setEdges((eds) => addEdge(newEdge, eds));
+    },
+    [nodes]
   );
 
   const addNode = useCallback((label: string, category: string, moduleId?: string) => {
+    // Define colors for each category
+    const categoryColors = {
+      'zk': '#667eea',
+      'fhe': '#764ba2', 
+      'io': '#f093fb',
+      'operation': '#4facfe',
+      'custom': '#a8edea'
+    };
+
+    const color = categoryColors[category as keyof typeof categoryColors] || categoryColors.custom;
+    
     const newNode: Node = {
       id: `${category}-${Date.now()}`,
       position: { 
         x: Math.random() * 400 + 100, 
         y: Math.random() * 300 + 100 
       },
-      data: { label, moduleId },
+      data: { 
+        label, 
+        moduleId,
+        category 
+      },
       type: 'default',
+      style: {
+        background: `linear-gradient(135deg, ${color}15, ${color}25)`,
+        border: `2px solid ${color}`,
+        borderRadius: '12px',
+        color: '#ffffff',
+        fontWeight: 600,
+        fontSize: '14px',
+        boxShadow: `0 4px 12px ${color}40`,
+        padding: '15px 20px',
+        minWidth: '180px',
+        textAlign: 'center' as const,
+      },
     };
     setNodes((nds) => [...nds, newNode]);
   }, []);
@@ -294,6 +348,29 @@ export default function BuilderPage() {
       }
     }
   };
+
+  const handleSaveModel = useCallback(() => {
+    const modelData = {
+      nodes,
+      edges,
+      savedAt: new Date().toISOString(),
+    };
+    
+    // Convert to JSON and download
+    const dataStr = JSON.stringify(modelData, null, 2);
+    const dataBlob = new Blob([dataStr], { type: 'application/json' });
+    const url = URL.createObjectURL(dataBlob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `model-${Date.now()}.json`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+    
+    // Optional: Show success message
+    alert('Model saved successfully!');
+  }, [nodes, edges]);
 
   return (
     <>
@@ -484,6 +561,16 @@ export default function BuilderPage() {
                 )}
               </select>
             </div>
+            
+            <div className="builder-save-button-container">
+              <button 
+                className="builder-save-model-button"
+                onClick={handleSaveModel}
+                title="Save Model"
+              >
+                Save Model
+              </button>
+            </div>
             </div>
           )}
         </div>
@@ -524,13 +611,35 @@ export default function BuilderPage() {
                 onConnect={onConnect}
                 fitView
                 className="react-flow-dark"
+                style={{
+                  background: `radial-gradient(circle at center, 
+                    rgba(102, 126, 234, 0.05) 0%, 
+                    rgba(118, 75, 162, 0.03) 25%, 
+                    rgba(240, 147, 251, 0.03) 50%, 
+                    rgba(79, 172, 254, 0.03) 75%, 
+                    transparent 100%)`
+                }}
               >
                 <Background />
                 <Controls />
                 <MiniMap 
-                  nodeColor="#667eea"
-                  maskColor="rgba(0, 0, 0, 0.8)"
-                  style={{ backgroundColor: 'rgba(0, 0, 0, 0.9)' }}
+                  nodeColor={(node) => {
+                    const categoryColors = {
+                      'zk': '#667eea',
+                      'fhe': '#764ba2',
+                      'io': '#f093fb',
+                      'operation': '#4facfe',
+                      'custom': '#a8edea'
+                    };
+                    const category = node.data?.category || 'custom';
+                    return categoryColors[category as keyof typeof categoryColors] || categoryColors.custom;
+                  }}
+                  maskColor="rgba(0, 0, 0, 0.7)"
+                  style={{
+                    backgroundColor: 'rgba(0, 0, 0, 0.85)',
+                    border: '1px solid rgba(255, 255, 255, 0.2)',
+                    borderRadius: '12px'
+                  }}
                 />
               </ReactFlow>
             </div>

@@ -1,8 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 export async function POST(request: NextRequest) {
+  let userMessage = 'Hello';
+  
   try {
-    const { message, context }: { message: string; context?: any } = await request.json();
+    const body = await request.json();
+    userMessage = body.message || 'Hello';
     
     // Real OpenAI integration (requires OPENAI_API_KEY)
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -20,7 +23,7 @@ export async function POST(request: NextRequest) {
           },
           {
             role: 'user',
-            content: message
+            content: userMessage
           }
         ],
         max_tokens: 500,
@@ -44,7 +47,7 @@ export async function POST(request: NextRequest) {
     console.error('Chat error:', error);
     
     // Fallback response if OpenAI is not available
-    const fallbackResponse = getFallbackResponse(message);
+    const fallbackResponse = getFallbackResponse(userMessage);
     
     return NextResponse.json({
       success: true,

@@ -16,7 +16,7 @@ export default function CardEffect() {
   const particleCanvasRef = useRef<HTMLCanvasElement>(null);
   const scannerCanvasRef = useRef<HTMLCanvasElement>(null);
   
-  const animationFrameRef = useRef<number>();
+  const animationFrameRef = useRef<number | undefined>(undefined);
   
   const particleSystemRef = useRef<any>(null);
   const particleScannerRef = useRef<any>(null);
@@ -170,7 +170,9 @@ export default function CardEffect() {
     }
 
     startDrag(e: MouseEvent | Touch) {
-      e.preventDefault();
+      if ('preventDefault' in e) {
+        e.preventDefault();
+      }
 
       this.isDragging = true;
       this.isAnimating = false;
@@ -192,7 +194,9 @@ export default function CardEffect() {
 
     onDrag(e: MouseEvent | Touch) {
       if (!this.isDragging) return;
-      e.preventDefault();
+      if ('preventDefault' in e) {
+        e.preventDefault();
+      }
 
       const deltaX = e.clientX - this.lastMouseX;
       this.position += deltaX;
@@ -302,16 +306,16 @@ export default function CardEffect() {
       const pick = (arr: string[]) => arr[randInt(0, arr.length - 1)];
 
       const commands = [
-        'siphon arbitrage --pair ETH/USDT --min-profit 0.5%',
-        'siphon swap --from USDC --to ETH --amount 1000',
-        'siphon snipe --token 0x... --amount 5ETH --gas-price 50',
-        'siphon protect --tx-hash 0x... --max-slippage 1%',
-        'siphon route --path USDC->WETH->DAI --amount 5000',
-        'siphon flash --protocol Aave --profit-target 2%',
-        'siphon optimize --tx-batch [0x...] --target 20gwei',
-        'siphon limit --pair BTC/ETH --price 0.065 --side buy',
-        'siphon liquidate --protocol Compound --min-profit 5%',
-        'siphon monitor --address 0x... --events Transfer,Swap',
+        'openio arbitrage --pair ETH/USDT --min-profit 0.5%',
+        'openio swap --from USDC --to ETH --amount 1000',
+        'openio snipe --token 0x... --amount 5ETH --gas-price 50',
+        'openio protect --tx-hash 0x... --max-slippage 1%',
+        'openio route --path USDC->WETH->DAI --amount 5000',
+        'openio flash --protocol Aave --profit-target 2%',
+        'openio optimize --tx-batch [0x...] --target 20gwei',
+        'openio limit --pair BTC/ETH --price 0.065 --side buy',
+        'openio liquidate --protocol Compound --min-profit 5%',
+        'openio monitor --address 0x... --events Transfer,Swap',
       ];
 
       const codeBlocks = [
@@ -407,7 +411,7 @@ export default function CardEffect() {
         {
           type: 'strategy',
           title: 'Arbitrage Bot',
-          command: 'siphon arbitrage --pair ETH/USDT --min-profit 0.5%',
+          command: 'openio arbitrage --pair ETH/USDT --min-profit 0.5%',
           description: 'Auto-detect price differences across DEXs',
           params: { gasLimit: '150000', slippage: '0.3%', timeout: '30s' },
           color: '#00d4ff',
@@ -415,7 +419,7 @@ export default function CardEffect() {
         {
           type: 'swap',
           title: 'Token Swap',
-          command: 'siphon swap --from USDC --to ETH --amount 1000',
+          command: 'openio swap --from USDC --to ETH --amount 1000',
           description: 'Execute token swap with optimal routing',
           params: { route: 'Uniswap V3', fee: '0.05%', deadline: '20m' },
           color: '#00ff88',
@@ -423,7 +427,7 @@ export default function CardEffect() {
         {
           type: 'strategy',
           title: 'Liquidity Sniping',
-          command: 'siphon snipe --token 0x... --amount 5ETH --gas-price 50',
+          command: 'openio snipe --token 0x... --amount 5ETH --gas-price 50',
           description: 'Front-run new liquidity pools',
           params: { priority: 'high', maxGas: '500000', retries: '3' },
           color: '#ff6b6b',
@@ -431,7 +435,7 @@ export default function CardEffect() {
         {
           type: 'command',
           title: 'MEV Protection',
-          command: 'siphon protect --tx-hash 0x... --max-slippage 1%',
+          command: 'openio protect --tx-hash 0x... --max-slippage 1%',
           description: 'Protect transactions from MEV attacks',
           params: { method: 'private-pool', cost: '0.01ETH', delay: '0ms' },
           color: '#ffd93d',
@@ -439,7 +443,7 @@ export default function CardEffect() {
         {
           type: 'swap',
           title: 'Multi-Hop Swap',
-          command: 'siphon route --path USDC->WETH->DAI --amount 5000',
+          command: 'openio route --path USDC->WETH->DAI --amount 5000',
           description: 'Multi-hop routing for better rates',
           params: { hops: '3', gasEstimate: '250000', minOut: '4950' },
           color: '#6bcf7f',
@@ -447,7 +451,7 @@ export default function CardEffect() {
         {
           type: 'strategy',
           title: 'Flash Loan Arbitrage',
-          command: 'siphon flash --protocol Aave --profit-target 2%',
+          command: 'openio flash --protocol Aave --profit-target 2%',
           description: 'Execute arbitrage using flash loans',
           params: { protocol: 'Aave V3', collateral: 'none', fee: '0.09%' },
           color: '#a78bfa',
@@ -455,7 +459,7 @@ export default function CardEffect() {
         {
           type: 'command',
           title: 'Gas Optimization',
-          command: 'siphon optimize --tx-batch [0x...] --target 20gwei',
+          command: 'openio optimize --tx-batch [0x...] --target 20gwei',
           description: 'Optimize gas usage across transactions',
           params: { savings: '15%', method: 'batching', delay: '5s' },
           color: '#fb7185',
@@ -463,7 +467,7 @@ export default function CardEffect() {
         {
           type: 'swap',
           title: 'Limit Order',
-          command: 'siphon limit --pair BTC/ETH --price 0.065 --side buy',
+          command: 'openio limit --pair BTC/ETH --price 0.065 --side buy',
           description: 'Place limit order on DEX',
           params: { expiry: '24h', fillType: 'partial', fee: '0.1%' },
           color: '#34d399',
@@ -471,7 +475,7 @@ export default function CardEffect() {
         {
           type: 'strategy',
           title: 'Liquidation Bot',
-          command: 'siphon liquidate --protocol Compound --min-profit 5%',
+          command: 'openio liquidate --protocol Compound --min-profit 5%',
           description: 'Auto-liquidate undercollateralized positions',
           params: { healthFactor: '<1.0', gasLimit: '300000', priority: 'high' },
           color: '#f87171',
@@ -479,7 +483,7 @@ export default function CardEffect() {
         {
           type: 'command',
           title: 'Transaction Monitoring',
-          command: 'siphon monitor --address 0x... --events Transfer,Swap',
+          command: 'openio monitor --address 0x... --events Transfer,Swap',
           description: 'Monitor on-chain events in real-time',
           params: { interval: '1s', alerts: 'webhook', history: '7d' },
           color: '#60a5fa',
