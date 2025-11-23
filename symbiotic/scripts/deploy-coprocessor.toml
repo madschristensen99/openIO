@@ -1,0 +1,33 @@
+:global deployer_url = "http://anvil:8545"
+:global deployer_pk = "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"
+:global deployer_addr = "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266"
+:global settlement_addr = "0x882B9439598239d9626164f7578F812Ef324F5Cb"
+
+echo "Deploying Coprocessor..."
+
+set -e
+
+export RPC_URL="${deployer_url}"
+export PRIVATE_KEY="${deployer_pk}"
+export SETTLEMENT_ADDRESS="${settlement_addr}"
+
+echo "Deploying Coprocessor contract..."
+coprocessor_address=$(cast send --rpc-url $RPC_URL --private-key $PRIVATE_KEY \
+  --create \
+  "0x$(cat out/Coprocessor.sol/Coprocessor.bin)" \
+  | jq -r '.contractAddress')
+
+echo "Coprocessor deployed at: $coprocessor_address"
+
+# Initialize the contract
+echo "Initializing Coprocessor..."
+cast send --rpc-url $RPC_URL --private-key $PRIVATE_KEY \
+  $coprocessor_address \
+  "initialize(address)" $SETTLEMENT_ADDRESS
+
+echo "Deployment complete!"
+echo "Coprocessor: $coprocessor_address"
+echo "Settlement: $SETTLEMENT_ADDRESS"
+
+# Save the address for reference
+echo $coprocessor_address > /tmp/coprocessor_address.txt
