@@ -6,7 +6,7 @@ import DappTabs from './DappTabs';
 import DappContent from './DappContent';
 import DappFeatures from './DappFeatures';
 
-type TabType = 'models' | 'spaces' | 'datasets' | 'zk-circuits' | 'fhe-engines';
+type TabType = 'models' | 'spaces' | 'datasets' | 'zk-circuits' | 'fhe-engines' | 'flow-diagrams';
 
 // Default data - can be overridden via props
 const defaultTrendingModels = [

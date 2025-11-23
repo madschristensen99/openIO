@@ -1,6 +1,6 @@
 'use client';
 
-type TabType = 'models' | 'spaces' | 'datasets' | 'zk-circuits' | 'fhe-engines';
+type TabType = 'models' | 'spaces' | 'datasets' | 'zk-circuits' | 'fhe-engines' | 'flow-diagrams';
 
 interface DappTabsProps {
   activeTab: TabType;
@@ -39,6 +39,12 @@ export default function DappTabs({ activeTab, onTabChange }: DappTabsProps) {
         onClick={() => onTabChange('fhe-engines')}
       >
         FHE Engines
+      </button>
+      <button 
+        className={`dapp-tab ${activeTab === 'flow-diagrams' ? 'active' : ''}`}
+        onClick={() => onTabChange('flow-diagrams')}
+      >
+        Flow Diagrams
       </button>
     </div>
   );

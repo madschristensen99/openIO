@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 
-type TabType = 'models' | 'spaces' | 'datasets' | 'zk-circuits' | 'fhe-engines';
+type TabType = 'models' | 'spaces' | 'datasets' | 'zk-circuits' | 'fhe-engines' | 'flow-diagrams';
 
 interface DappContentProps {
   activeTab: TabType;
@@ -151,6 +151,29 @@ export default function DappContent({
                 </div>
               </div>
             ))}
+          </div>
+        </div>
+      )}
+
+      {activeTab === 'flow-diagrams' && (
+        <div className="dapp-section">
+          <div className="section-header">
+            <h2 className="section-title">AI-Powered Flow Diagrams</h2>
+          </div>
+          <div style={{ height: '60vh', padding: '1rem' }}>
+            <div className="bg-white rounded-lg shadow-lg overflow-hidden h-full">
+              <div className="h-full">
+                {/* Dynamically import the flow generator */}
+                <script type="text/javascript">
+                  {`
+                    import('/components/AIFlowGenerator').then(module => {
+                      const AIFlowGenerator = module.default;
+                      // Create and mount the component
+                    });
+                  `}
+                </script>
+              </div>
+            </div>
           </div>
         </div>
       )}
