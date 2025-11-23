@@ -16,7 +16,7 @@ export default function CardEffect() {
   const particleCanvasRef = useRef<HTMLCanvasElement>(null);
   const scannerCanvasRef = useRef<HTMLCanvasElement>(null);
   
-  const animationFrameRef = useRef<number>();
+  const animationFrameRef = useRef<number | undefined>(undefined);
   
   const particleSystemRef = useRef<any>(null);
   const particleScannerRef = useRef<any>(null);
@@ -170,7 +170,9 @@ export default function CardEffect() {
     }
 
     startDrag(e: MouseEvent | Touch) {
-      e.preventDefault();
+      if ('preventDefault' in e) {
+        e.preventDefault();
+      }
 
       this.isDragging = true;
       this.isAnimating = false;
@@ -192,7 +194,9 @@ export default function CardEffect() {
 
     onDrag(e: MouseEvent | Touch) {
       if (!this.isDragging) return;
-      e.preventDefault();
+      if ('preventDefault' in e) {
+        e.preventDefault();
+      }
 
       const deltaX = e.clientX - this.lastMouseX;
       this.position += deltaX;

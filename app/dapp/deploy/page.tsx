@@ -8,10 +8,12 @@ import Terminal from '../components/Terminal';
 import AIChat from '../components/AIChat';
 
 export default function DeployPage() {
-  const [selectedFile, setSelectedFile] = useState<string | null>('SealedLogic.sol');
-  const [files, setFiles] = useState({
-    'SealedLogic.sol': `// SPDX-License-Identifier: MIT
-pragma solidity ^0.8.25;
+
+  const [selectedFile, setSelectedFile] = useState<string | null>('contract.io');
+  const [files, setFiles] = useState<Record<string, string>>({
+    'contract.io': `// openIO Contract Example
+// This contract demonstrates sealed logic
+
 
 contract SealedLogic {
     mapping(address => uint256) private balances;
