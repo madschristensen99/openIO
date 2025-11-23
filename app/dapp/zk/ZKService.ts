@@ -34,46 +34,31 @@ export class ZKService {
 
   async compileCircom(circuitCode: string, circuitName: string): Promise<any> {
     try {
-      // In a real implementation, this would call circom compiler
-      const { execSync } = require('child_process');
-      const fs = require('fs');
-      const path = require('path');
-
-      // Create temporary directory for compilation
-      const tempDir = path.join('/tmp', `circom-${Date.now()}`);
-      const circuitPath = path.join(tempDir, `${circuitName}.circom`);
-      
-      fs.mkdirSync(tempDir, { recursive: true });
-      fs.writeFileSync(circuitPath, circuitCode);
-
-      // Run circom compiler (would need circom installed)
-      const compileResult = {
-        constraints: 100,
+      // Mock compilation result instead of using Node.js APIs
+      // This avoids Turbopack issues with require('fs'), require('path')
+      return { 
+        success: true, 
+        constraints: Math.floor(Math.random() * 1000) + 50,
         witness: { type: 'array', v: [] },
-        r1cs: {},
-        wasm: {},
-        zkey: {}
+        r1cs: { provingKey: 'mock-key' },
+        wasm: { bytecode: 'mock-wasm' },
+        zkey: { key: 'mock-zkey' }
       };
-
-      return { success: true, ...compileResult };
     } catch (error) {
       console.error('Circom compilation error:', error);
-      throw new Error(`Failed to compile Circom circuit: ${error.message}`);
+      throw new Error(`Failed to compile Circom circuit: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
 
   async compileNoir(circuitCode: string, circuitName: string): Promise<any> {
     try {
-      // Mock noir compilation - will use nargo CLI in real implementation
-      const noirInstance = new Noir(new ArrayBuffer(1000));
-      
+      // Mock Noir compilation avoiding any dynamic loading
       return {
         success: true,
-        bytecode: new Uint8Array(1000).buffer,
-        abi: {
-          parameters: [{ type: 'field', name: 'input', public: false }],
-          return_type: { kind: 'field' }
-        }
+        constraints: Math.floor(Math.random() * 800) + 100,
+        witnessLength: Math.floor(Math.random() * 50) + 5,
+        bytecode: new Array(100).fill('0').join(''),
+        abi: { input_params: ['Field'], return_params: ['Field'] }
       };
     } catch (error) {
       console.error('Noir compilation error:', error);
@@ -101,10 +86,10 @@ export class ZKService {
   }
 
   async proveNoir(circuitCode: string, inputs: Record<string, any>): Promise<any> {
-    // Mock Noir proving - will use nargo CLI in real implementation
+    // Mock Noir proving using simple crypto simulation
     return {
-      proof: new Array(192).fill('0').join(''),
-      publicInputs: Object.values(inputs)
+      proof: Array.from({length: 64}, () => Math.floor(Math.random()*16).toString(16)).join(''),
+      publicInputs: Object.values(inputs).map(v => String(v))
     };
   }
 
@@ -113,8 +98,8 @@ export class ZKService {
       if (circuitType === 'circom') {
         return await snarkjs.groth16.verify(verificationKey, publicInputs, proof);
       } else {
-        // Mock Noir verification
-        return true; // In real implementation would use nargo verify
+        // Mock Noir verification with 98% success rate for demo
+        return Math.random() > 0.02;
       }
     } catch (error) {
       console.error('Verification error:', error);
