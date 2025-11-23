@@ -12,22 +12,29 @@ export type ChatMessage = { role: 'user' | 'assistant'; content: string }
 const INDEX_CACHE_PATH = path.join(process.cwd(), 'index-cache.json')
 const EMBEDDINGS_0G_ROOT_HASH = process.env.EMBEDDINGS_0G_ROOT_HASH
 
-let cachedChunks: Chunk[] | null = null
+let cachedChunks: Chunk[] | undefined
 let loadingPromise: Promise<Chunk[]> | null = null
 
 async function loadEmbeddings(): Promise<Chunk[]> {
-  if (cachedChunks) return cachedChunks
+  if (cachedChunks !== undefined) return cachedChunks
   if (loadingPromise) return loadingPromise
 
   loadingPromise = (async () => {
     if (fs.existsSync(INDEX_CACHE_PATH)) {
       const data = fs.readFileSync(INDEX_CACHE_PATH, 'utf-8')
-      cachedChunks = JSON.parse(data)
+      const parsed = JSON.parse(data)
+      if (!Array.isArray(parsed)) {
+        throw new Error('Cached embeddings index is invalid; expected an array')
+      }
+      cachedChunks = parsed
       return cachedChunks
     }
 
     if (EMBEDDINGS_0G_ROOT_HASH) {
       const downloaded = await downloadJSONFrom0G(EMBEDDINGS_0G_ROOT_HASH)
+      if (!Array.isArray(downloaded)) {
+        throw new Error('Downloaded embeddings index is invalid; expected an array')
+      }
       cachedChunks = downloaded
 
       try {
