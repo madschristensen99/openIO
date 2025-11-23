@@ -1,8 +1,8 @@
 {
-  "rootDirectory": "0g",
-  "buildCommand": "npm run build",
-  "outputDirectory": "next",
-  "devCommand": "npm run dev",
-  "installCommand": "npm install",
-  "framework": "nextjs"
+  "builds": [
+    {
+      "src": "0g/package.json",
+      "use": "@vercel/next"
+    }
+  ]
 }
