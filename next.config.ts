@@ -1,18 +1,25 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  /* config options here */
-  // Exclude 0g directory from build as it's a separate project
-  // Turbopack config (Next.js 16+)
+  // Minimal turbopack configuration
   turbopack: {},
-  // Webpack config for compatibility
+  
+  // Handle Node.js built-ins properly
   webpack: (config, { isServer }) => {
-    config.watchOptions = {
-      ...config.watchOptions,
-      ignored: ['**/0g/**', '**/node_modules/**'],
+    config.resolve.fallback = {
+      fs: false,
+      path: 'path-browserify',
+      os: false,
+      child_process: false,
     };
     return config;
   },
+  
+  // Configure server-side handling
+  serverExternalPackages: ['@0glabs/0g-ts-sdk'],
+  
+  // Handle file paths and staging
+  optimizeFonts: false,
 };
 
 export default nextConfig;
