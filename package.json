@@ -39,7 +39,7 @@
     "circomlib": "^2.0.5",
     "@noir-lang/noir_js": "^1.0.0-beta.1",
     "@noir-lang/backend_barretenberg": "^1.0.0-beta.1",
-    "@boundless-sdk/client": "^1.0.0",
+    "@risc0/ethereum-contracts": "^1.0.0",
     "uuid": "^11.0.3",
     "@types/uuid": "^10.0.0"
   },

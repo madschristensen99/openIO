@@ -1,7 +1,6 @@
 import * as snarkjs from 'snarkjs';
 import { BarretenbergBackend } from '@noir-lang/backend_barretenberg';
 import { Noir } from '@noir-lang/noir_js';
-import { Boundless } from '@boundless-sdk/client';
 
 export interface CircuitConfig {
   type: 'circom' | 'noir';
@@ -29,12 +28,9 @@ export interface DeployOptions {
 }
 
 export class ZKService {
-  private boundlessClient: Boundless | null = null;
-
-  constructor(private boundlessConfig?: any) {
-    if (boundlessConfig) {
-      this.boundlessClient = new Boundless(boundlessConfig);
-    }
+  // Mock ZK network integration for demo purposes
+  constructor(private config?: any) {
+    // Initialize with mock bindings instead of real Boundless
   }
 
   async compileCircom(circuitCode: string, circuitName: string): Promise<any> {
@@ -125,23 +121,23 @@ export class ZKService {
     }
   }
 
-  async deployToBoundless(options: DeployOptions): Promise<string> {
-    if (!this.boundlessClient) {
-      throw new Error('Boundless client not initialized');
-    }
-
+  async deployToZKNetwork(options: DeployOptions): Promise<string> {
+    // Mock deployment for ZK networks (like Boundless, Polygon, etc.)
     try {
-      const deploymentId = await this.boundlessClient.deployProof({
-        proof: options.proof,
-        publicInputs: options.publicInputs,
+      // Simulate deployment process
+      const deploymentId = `zk-deploy-${Date.now()}-${Math.random().toString(36).substring(2, 15)}`;
+      
+      console.log('Deploying to ZK network:', {
+        deployment: deploymentId,
         circuitHash: options.circuitHash,
-        verifierKey: options.verifierKey
+        publicInputsCount: options.publicInputs?.length || 0,
+        network: 'demo-zk-network'
       });
 
       return deploymentId;
     } catch (error) {
-      console.error('Boundless deployment error:', error);
-      throw new Error(`Failed to deploy proof: ${error.message}`);
+      console.error('ZK deployment error:', error);
+      throw new Error(`Failed to deploy proof: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
 

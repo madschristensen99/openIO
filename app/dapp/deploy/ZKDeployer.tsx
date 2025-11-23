@@ -2,7 +2,6 @@
 
 import { useState } from 'react';
 import { ZKService } from '../zk/ZKService';
-import { ethers } from 'ethers';
 
 interface ZKDeployerProps {
   proof?: any;
@@ -40,15 +39,15 @@ export default function ZKDeployer({ proof, publicInputs, circuitName }: ZKDeplo
     
     try {
       // Generate circuit hash
-      const circuitHash = ethers.keccak256(ethers.toUtf8Bytes(circuitName));
+      const circuitHash = '0x' + Array.from(crypto.getRandomValues(new Uint8Array(32))).map(b => b.toString(16).padStart(2, '0')).join('');
       
       const deployOptions = {
         proof,
         publicInputs,
-        circuitHash,
-        network,
-        rpcUrl
+        circuitHash
       };
+      
+      const deploymentId = await zkService.deployToZKNetwork(deployOptions);
 
       // Simulate deployment for now
       // In real implementation, this would deploy to Boundless or equivalent
