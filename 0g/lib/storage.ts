@@ -36,6 +36,10 @@ export async function uploadJSONTo0G(data: any, tempFileName: string = 'embeddin
     }
 
     const rootHash = tree.rootHash()
+    if (rootHash === null) {
+      await file.close()
+      throw new Error('Failed to get merkle root hash')
+    }
     await file.close()
 
     fs.unlinkSync(tempPath)
@@ -95,6 +99,10 @@ export async function uploadFileToZG(filePath: string): Promise<string> {
   }
 
   const rootHash = tree.rootHash()
+  if (rootHash === null) {
+    await file.close()
+    throw new Error('Failed to get merkle root hash')
+  }
   await file.close()
 
   return rootHash
