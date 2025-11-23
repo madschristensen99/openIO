@@ -21,7 +21,8 @@ export async function uploadJSONTo0G(data: any, tempFileName: string = 'embeddin
     const indexer = new Indexer(INDEXER_RPC)
 
     const file = await ZgFile.fromFilePath(tempPath)
-    const [tx, err] = await indexer.upload(file, EVM_RPC, signer)
+    // 0g-ts-sdk expects a v5-style Signer type; cast to avoid the v6 ESM/CommonJS type mismatch.
+    const [tx, err] = await indexer.upload(file, EVM_RPC, signer as any)
 
     if (err !== null) {
       await file.close()
@@ -79,7 +80,8 @@ export async function uploadFileToZG(filePath: string): Promise<string> {
   const indexer = new Indexer(INDEXER_RPC)
 
   const file = await ZgFile.fromFilePath(filePath)
-  const [tx, err] = await indexer.upload(file, EVM_RPC, signer)
+  // 0g-ts-sdk expects a v5-style Signer type; cast to avoid the v6 ESM/CommonJS type mismatch.
+  const [tx, err] = await indexer.upload(file, EVM_RPC, signer as any)
 
   if (err !== null) {
     await file.close()
