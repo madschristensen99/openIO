@@ -8,6 +8,7 @@ import { models, getModelsByCategory, ModelCategory } from '../../data/models';
 import AIChat from '../components/AIChat';
 import CodeEditor from '../components/CodeEditor';
 import FileExplorer from '../components/FileExplorer';
+import FHEKeyModal from '../components/FHEKeyModal';
 
 const initialNodes: Node[] = [];
 
@@ -561,6 +562,17 @@ export default function BuilderPage() {
                 )}
               </select>
             </div>
+
+            <div className="builder-dropdown-group">
+              <label className="builder-dropdown-label">FHE Keys</label>
+              <button 
+                className="builder-fhe-key-button"
+                onClick={() => setIsFHEModalOpen(true)} 
+                title="Generate FHE Keys"
+              >
+                🔐 Generate FHE Keys
+              </button>
+            </div>
             
             <div className="builder-save-button-container">
               <button 
@@ -664,6 +676,18 @@ export default function BuilderPage() {
           </div>
         </div>
       </div>
+      
+      <FHEKeyModal
+        isOpen={isFHEModalOpen}
+        onClose={() => setIsFHEModalOpen(false)}
+        onKeyGenerated={(keys) => {
+          setFheKeys(prev => [...prev, keys]);
+        }}
+        onDeployTo0G={(deployment) => {
+          console.log('FHE keys deployed to 0G:', deployment);
+          // You can handle the deployment result here
+        }}
+      />
     </>
   );
 }
