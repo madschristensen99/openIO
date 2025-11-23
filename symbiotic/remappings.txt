@@ -1,0 +1,6 @@
+node_modules/@symbioticfi/relay-contracts:forge-std/=lib/forge-std/src/
+@openzeppelin/contracts/=node_modules/@openzeppelin/contracts/
+@openzeppelin/contracts-upgradeable/=node_modules/@openzeppelin/contracts-upgradeable/
+@symbioticfi/relay-contracts/=node_modules/@symbioticfi/relay-contracts/
+@symbioticfi/network/=node_modules/@symbioticfi/network/
+@symbioticfi/core/=node_modules/@symbioticfi/core/

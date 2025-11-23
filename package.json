@@ -1,0 +1,49 @@
+{
+  "name": "openio",
+  "version": "1.0.0",
+  "private": true,
+  "description": "OpenIO workspace combining payment helpers with the Next.js UI",
+  "main": "index.js",
+  "directories": {
+    "doc": "docs"
+  },
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/madschristensen99/openIO.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/madschristensen99/openIO/issues"
+  },
+  "homepage": "https://github.com/madschristensen99/openIO#readme",
+  "dependencies": {
+    "@types/three": "^0.181.0",
+    "@xyflow/react": "^12.9.3",
+    "axios": "^1.13.2",
+    "next": "16.0.3",
+    "react": "19.2.0",
+    "react-dom": "19.2.0",
+    "three": "^0.181.2",
+    "viem": "^2.39.3",
+    "x402-axios": "^0.7.2"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4",
+    "@types/node": "^24.10.1",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "eslint": "^9",
+    "eslint-config-next": "16.0.3",
+    "tailwindcss": "^4",
+    "typescript": "^5.9.3"
+  }
+}
