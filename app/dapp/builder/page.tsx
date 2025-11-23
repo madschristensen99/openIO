@@ -295,6 +295,29 @@ export default function BuilderPage() {
     }
   };
 
+  const handleSaveModel = useCallback(() => {
+    const modelData = {
+      nodes,
+      edges,
+      savedAt: new Date().toISOString(),
+    };
+    
+    // Convert to JSON and download
+    const dataStr = JSON.stringify(modelData, null, 2);
+    const dataBlob = new Blob([dataStr], { type: 'application/json' });
+    const url = URL.createObjectURL(dataBlob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `model-${Date.now()}.json`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+    
+    // Optional: Show success message
+    alert('Model saved successfully!');
+  }, [nodes, edges]);
+
   return (
     <>
       <Navbar />
@@ -483,6 +506,16 @@ export default function BuilderPage() {
                   <option value="" disabled>No custom modules yet</option>
                 )}
               </select>
+            </div>
+            
+            <div className="builder-save-button-container">
+              <button 
+                className="builder-save-model-button"
+                onClick={handleSaveModel}
+                title="Save Model"
+              >
+                Save Model
+              </button>
             </div>
             </div>
           )}
