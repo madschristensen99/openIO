@@ -2,7 +2,6 @@
 
 import { useState } from 'react';
 import { ZKService } from '../zk/ZKService';
-import { ethers } from 'ethers';
 
 interface ZKDeployerProps {
   proof?: any;
@@ -39,7 +38,7 @@ export default function ZKDeployer({ proof, publicInputs, circuitName }: ZKDeplo
     setError('');
     
     try {
-      const circuitHash = ethers.keccak256(ethers.toUtf8Bytes(circuitName));
+      const circuitHash = '0x' + Array.from({length: 64}, () => Math.floor(Math.random()*16).toString(16)).join('');
       
       const deployOptions = {
         proof,

@@ -52,13 +52,13 @@ export class ZKService {
 
   async compileNoir(circuitCode: string, circuitName: string): Promise<any> {
     try {
-      // Mock Noir compilation avoiding any dynamic loading
+      // Mock Noir compilation - simplified browser-safe version
       return {
         success: true,
         constraints: Math.floor(Math.random() * 800) + 100,
         witnessLength: Math.floor(Math.random() * 50) + 5,
-        bytecode: new Array(100).fill('0').join(''),
-        abi: { input_params: ['Field'], return_params: ['Field'] }
+        bytecode: 'mock-bytecode',
+        abi: { params: ['input'], returnType: 'uint256' }
       };
     } catch (error) {
       console.error('Noir compilation error:', error);
